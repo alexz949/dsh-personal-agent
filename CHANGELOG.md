@@ -2,7 +2,9 @@
 
 ## Unreleased
 
-- Logins made in the `browser_login` window now survive the next browser start. Sites such as Canvas sign in with session cookies, which Chrome drops when it starts (Playwright's Chrome never restores a session, so "continue where you left off" does not help). When the sign-in window quits, the plugin turns the session cookies used in it into cookies that last 30 days, in the assistant's profile only, and notes it in the action log.
+- Logins made in the `browser_login` window now survive the next browser start. Sites such as Canvas sign in with session cookies, which Chrome drops when it starts (Playwright's Chrome never restores a session, so "continue where you left off" does not help). When the sign-in window quits, the plugin turns the session cookies used in it into cookies that last 30 days, in the assistant's profile only, and notes it in the action log. Canvas also hands out a fresh session cookie on every page, so the sites signed in to are remembered (`personal-agent-kept-sites.json` in the profile) and their session cookies are kept again whenever no Chrome holds the profile: when DSH starts and after each browser exit.
+- The preset prompt explains the two browsers (the headless one the assistant uses and the visible sign-in window) and asks for plain, step-by-step sign-in instructions without words like cookie or SSO.
+- The sign-in watcher test no longer gets cancelled in CI: its timer is no longer unref'd in tests.
 
 - `calendar_update` takes `repeat`: change an event's repeat rule from one occurrence on, end a series early with an earlier `until`, or `"none"` to keep that occurrence and drop the rest. The helper already supported this; the tool now passes it on. The card lists how many later occurrences drop off and when, a new rule is always saved for this and later occurrences, and the action log records the old and new rule.
 

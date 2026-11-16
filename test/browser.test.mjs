@@ -4,7 +4,7 @@ import { execFileSync } from 'node:child_process';
 import { mkdtemp, mkdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { profileHolder, loginUrl, chromeArgs, browserLoginTool, keepSessionCookies, watchLoginWindow } from '../src/browser.js';
+import { profileHolder, loginUrl, chromeArgs, browserLoginTool, keepSessionCookies, keepSiteCookies, watchLoginWindow, startLoginKeeper, siteOf, loadSites, rememberSites } from '../src/browser.js';
 
 test('the profile holder comes from a live SingletonLock', async () => {
   const link = target => async () => target;
@@ -53,7 +53,7 @@ test('keepSessionCookies makes recent session cookies last 30 days and leaves th
     const now = new Date(), old = new Date(now.getTime() - 86400000);
     execFileSync('/usr/bin/sqlite3', [db, `create table cookies (host_key text, name text, is_persistent integer, has_expires integer, expires_utc integer, last_access_utc integer);
       insert into cookies values ('canvas.example.edu', 'canvas_session', 0, 0, 0, ${chrome(now)}), ('old.example.com', 'stale', 0, 0, 0, ${chrome(old)}), ('news.example.com', 'kept', 1, 1, 42, ${chrome(now)});`]);
-    assert.equal(await keepSessionCookies(profile, new Date(now.getTime() - 60000)), 1);
+    assert.deepEqual(await keepSessionCookies(profile, new Date(now.getTime() - 60000)), { kept: 1, hosts: ['canvas.example.edu'] });
     const rows = execFileSync('/usr/bin/sqlite3', [db, 'select name, is_persistent, has_expires, expires_utc from cookies order by name']).toString().trim().split('\n').map(row => row.split('|'));
     const byName = Object.fromEntries(rows.map(([name, ...rest]) => [name, rest.map(Number)]));
     assert.deepEqual(byName.canvas_session.slice(0, 2), [1, 1]);
@@ -70,12 +70,12 @@ test('the sign-in watcher keeps logins only after that window quits and before a
   const run = async (holds, { dead = () => true, ...rest } = {}) => {
     const kept = [], logged = [];
     let call = 0;
-    const result = await watchLoginWindow('/p', new Date(0), { holder: async () => holds[Math.min(call++, holds.length - 1)], alive: pid => !dead(pid, call), keep: async () => { kept.push(true); return 3; }, log: async (_tool, text) => { logged.push(text); }, every: 1, ...rest });
+    const result = await watchLoginWindow('/p', new Date(0), { holder: async () => holds[Math.min(call++, holds.length - 1)], alive: pid => !dead(pid, call), keep: async () => { kept.push(true); return { kept: 3, hosts: ['canvas.example.edu', '.shib.example.edu'] }; }, remember: async (_profile, hosts) => hosts.map(siteOf), log: async (_tool, text) => { logged.push(text); }, every: 1, unref: false, ...rest });
     return { result, kept, logged };
   };
   const quit = await run([undefined, 500, 500, undefined], { dead: (_pid, call) => call >= 4 });
-  assert.deepEqual(quit.result, { kept: 3 });
-  assert.deepEqual(quit.logged, ['保留登录：3 个会话 cookie 改为 30 天内有效']);
+  assert.deepEqual(quit.result, { kept: 3, sites: ['example.edu', 'example.edu'] });
+  assert.deepEqual(quit.logged, ['保留登录：3 个会话 cookie 改为 30 天内有效（example.edu）']);
 
   const raced = await run([500, 600], { dead: pid => pid === 500 });
   assert.match(raced.result.reason, /pid 600/);
@@ -84,4 +84,48 @@ test('the sign-in watcher keeps logins only after that window quits and before a
   const never = await run([undefined], { appear: 5 });
   assert.match(never.result.reason, /never opened/);
   assert.deepEqual(never.kept, []);
+});
+
+test('cookie hosts map to their site, and remembered sites are merged into a file in the profile', async () => {
+  assert.equal(siteOf('.shib.oit.duke.edu'), 'duke.edu');
+  assert.equal(siteOf('canvas.duke.edu'), 'duke.edu');
+  assert.equal(siteOf('sso.canvaslms.com'), 'canvaslms.com');
+  assert.equal(siteOf('jw.example.edu.cn'), 'example.edu.cn');
+  assert.equal(siteOf('localhost'), undefined);
+  assert.equal(siteOf("x'; drop table cookies; --.com"), undefined);
+  const profile = await mkdtemp(join(tmpdir(), 'pa-sites-'));
+  try {
+    assert.deepEqual(await loadSites(profile), []);
+    assert.deepEqual(await rememberSites(profile, ['go.canvas.duke.edu', '.shib.oit.duke.edu']), ['duke.edu']);
+    assert.deepEqual(await rememberSites(profile, ['sso.canvaslms.com']), ['canvaslms.com', 'duke.edu']);
+    assert.deepEqual(await loadSites(profile), ['canvaslms.com', 'duke.edu']);
+  } finally {
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
+test('keepSiteCookies keeps the session cookies of remembered sites only', async () => {
+  const profile = await mkdtemp(join(tmpdir(), 'pa-site-cookies-'));
+  try {
+    await mkdir(join(profile, 'Default'));
+    const db = join(profile, 'Default', 'Cookies');
+    execFileSync('/usr/bin/sqlite3', [db, `create table cookies (host_key text, name text, is_persistent integer, has_expires integer, expires_utc integer, last_access_utc integer);
+      insert into cookies values ('canvas.duke.edu', 'canvas_session', 0, 0, 0, 1), ('.duke.edu', 'sso', 0, 0, 0, 1), ('notduke.edu', 'other', 0, 0, 0, 1), ('ads.example.com', 'ad', 0, 0, 0, 1);`]);
+    assert.equal(await keepSiteCookies(profile, ['duke.edu']), 2);
+    const rows = execFileSync('/usr/bin/sqlite3', [db, 'select name, is_persistent from cookies order by name']).toString().trim();
+    assert.equal(rows, 'ad|0\ncanvas_session|1\nother|0\nsso|1');
+    assert.equal(await keepSiteCookies(profile, []), 0);
+  } finally {
+    await rm(profile, { recursive: true, force: true });
+  }
+});
+
+test('the login keeper runs when the profile is free at start and again after each browser exit, not while one holds it', async () => {
+  const holds = [undefined, undefined, 700, 700, undefined, undefined, 800];
+  let call = 0;
+  const kept = [];
+  const stop = startLoginKeeper('/p', { holder: async () => holds[Math.min(call++, holds.length - 1)], sites: async () => ['duke.edu'], keep: async (_profile, sites) => { kept.push(call); return sites.length; }, every: 1, unref: false });
+  await new Promise(resolve => setTimeout(resolve, 50));
+  stop();
+  assert.deepEqual(kept, [1, 5]);
 });

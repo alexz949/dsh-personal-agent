@@ -4,7 +4,7 @@
 // reuses the saved login. Chrome allows one process per profile, so this refuses while the
 // headless browser (or an earlier login window) still holds it.
 import { execFile, spawn } from 'node:child_process';
-import { copyFile, mkdir, readlink, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readFile, readlink, stat, writeFile } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { loadSettings } from './config.js';
 import { actionLogger } from './log.js';
@@ -38,17 +38,58 @@ export function loginUrl(value) {
 export const chromeArgs = (profile, url) => ['-na', 'Google Chrome', '--args', `--user-data-dir=${profile}`, '--use-mock-keychain', '--password-store=basic', '--no-first-run', '--no-default-browser-check', ...url ? [url] : []];
 
 const KEEP_DAYS = 30;
+const SITES_FILE = 'personal-agent-kept-sites.json';
+
+// Chrome stores times as microseconds since 1601-01-01.
+const chromeTime = seconds => `(${seconds} + 11644473600) * 1000000`;
+const promote = days => `update cookies set is_persistent = 1, has_expires = 1, expires_utc = ${chromeTime(`strftime('%s', 'now') + ${days * 86400}`)}`;
+
+// Suffixes under which a site takes three labels (canvas.example.edu.cn → example.edu.cn).
+const TWO_LABEL_SUFFIXES = new Set(['com.cn', 'edu.cn', 'org.cn', 'net.cn', 'gov.cn', 'ac.cn', 'co.uk', 'ac.uk', 'org.uk', 'co.jp', 'ac.jp', 'com.au', 'edu.au', 'com.hk', 'edu.hk', 'com.tw', 'edu.tw', 'com.sg', 'edu.sg']);
+
+/** The site a cookie host belongs to: ".shib.oit.duke.edu" → "duke.edu". */
+export function siteOf(host) {
+  const labels = String(host).toLowerCase().replace(/^\./, '').split('.').filter(Boolean);
+  if (labels.length < 2 || !labels.every(label => /^[a-z0-9-]+$/.test(label))) return undefined;
+  const take = labels.length >= 3 && TWO_LABEL_SUFFIXES.has(labels.slice(-2).join('.')) ? 3 : 2;
+  return labels.slice(-take).join('.');
+}
 
 /** Turn the session cookies touched since `since` (a Date) into cookies that last KEEP_DAYS days,
  * so a login survives the next browser start: Chrome drops session cookies when it starts, and
  * Playwright's Chrome never restores a session. Values stay encrypted as they were. Run only while
- * no Chrome holds the profile. Returns how many cookies changed. */
+ * no Chrome holds the profile. Returns how many cookies changed and their hosts. */
 export async function keepSessionCookies(profile, since, { sqlite = runSqlite, days = KEEP_DAYS } = {}) {
-  const from = Math.floor(since.getTime() / 1000);
-  // Chrome stores times as microseconds since 1601-01-01.
-  const sql = `update cookies set is_persistent = 1, has_expires = 1, expires_utc = (strftime('%s', 'now') + ${days * 86400} + 11644473600) * 1000000 where is_persistent = 0 and last_access_utc >= (${from} + 11644473600) * 1000000; select changes();`;
-  const out = await sqlite(join(profile, 'Default', 'Cookies'), sql);
+  const recent = `is_persistent = 0 and last_access_utc >= ${chromeTime(Math.floor(since.getTime() / 1000))}`;
+  const out = await sqlite(join(profile, 'Default', 'Cookies'), `select distinct host_key from cookies where ${recent}; ${promote(days)} where ${recent}; select changes();`);
+  const lines = String(out).trim().split('\n').filter(Boolean);
+  return { kept: Number(lines.at(-1)) || 0, hosts: lines.slice(0, -1) };
+}
+
+/** Keep the session cookies of sites the user signed in to in a login window. Sites such as Canvas
+ * hand out a fresh session cookie on every page, which replaces the one kept at sign-in, so this
+ * runs again after every browser exit. Returns how many cookies changed. */
+export async function keepSiteCookies(profile, sites, { sqlite = runSqlite, days = KEEP_DAYS } = {}) {
+  const safe = sites.filter(site => /^[a-z0-9.-]+$/.test(site));
+  if (safe.length === 0) return 0;
+  const match = safe.map(site => `host_key = '${site}' or host_key like '%.${site}'`).join(' or ');
+  const out = await sqlite(join(profile, 'Default', 'Cookies'), `${promote(days)} where is_persistent = 0 and (${match}); select changes();`);
   return Number(String(out).trim().split('\n').at(-1)) || 0;
+}
+
+export async function loadSites(profile, { read = readFile } = {}) {
+  try {
+    const sites = JSON.parse(await read(join(profile, SITES_FILE), 'utf8'));
+    return Array.isArray(sites) ? sites.filter(site => typeof site === 'string') : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function rememberSites(profile, hosts, { read = readFile, write = writeFile } = {}) {
+  const sites = [...new Set([...await loadSites(profile, { read }), ...hosts.map(siteOf).filter(Boolean)])].sort();
+  await write(join(profile, SITES_FILE), `${JSON.stringify(sites, null, 2)}\n`, 'utf8');
+  return sites;
 }
 
 function runSqlite(file, sql) {
@@ -57,10 +98,10 @@ function runSqlite(file, sql) {
   });
 }
 
-/** After a sign-in window opens, wait for that Chrome to quit, then keep the logins made in it.
- * Gives up if the window never takes the profile, if another Chrome takes it first, or after
- * `limit` ms. Polls with an unref'd timer so it never keeps DSH running. */
-export function watchLoginWindow(profile, since, { holder = profileHolder, keep = keepSessionCookies, log = async () => {}, every = 1000, appear = 30000, limit = 3 * 3600 * 1000, alive = isAlive } = {}) {
+/** After a sign-in window opens, wait for that Chrome to quit, then keep the logins made in it and
+ * remember their sites. Gives up if the window never takes the profile, if another Chrome takes it
+ * first, or after `limit` ms. Polls with an unref'd timer so it never keeps DSH running. */
+export function watchLoginWindow(profile, since, { holder = profileHolder, keep = keepSessionCookies, remember = rememberSites, log = async () => {}, every = 1000, appear = 30000, limit = 3 * 3600 * 1000, alive = isAlive, unref = true } = {}) {
   return new Promise(resolve => {
     const started = Date.now();
     let window;
@@ -77,9 +118,10 @@ export function watchLoginWindow(profile, since, { holder = profileHolder, keep 
         }
         if (alive(window)) return Date.now() - started > limit ? done({ kept: 0, reason: 'the sign-in window stayed open too long' }) : undefined;
         if (pid !== undefined) return done({ kept: 0, reason: `another Chrome (pid ${pid}) took the profile first` });
-        const kept = await keep(profile, since);
-        if (kept > 0) await log('browser_login', `保留登录：${kept} 个会话 cookie 改为 ${KEEP_DAYS} 天内有效`).catch(() => {});
-        done({ kept });
+        const { kept, hosts } = await keep(profile, since);
+        const sites = hosts.length > 0 ? await remember(profile, hosts) : [];
+        if (kept > 0) await log('browser_login', `保留登录：${kept} 个会话 cookie 改为 ${KEEP_DAYS} 天内有效（${hosts.map(siteOf).filter((site, i, all) => site && all.indexOf(site) === i).join('、')}）`).catch(() => {});
+        done({ kept, sites });
       } catch (error) {
         done({ kept: 0, reason: error?.message ?? String(error) });
       } finally {
@@ -87,8 +129,35 @@ export function watchLoginWindow(profile, since, { holder = profileHolder, keep 
       }
     };
     const timer = setInterval(tick, every);
-    timer.unref?.();
+    if (unref) timer.unref?.();
   });
+}
+
+/** Keep remembered sites signed in for as long as DSH runs: whenever no Chrome holds the profile
+ * (at start, and each time the headless browser closes), keep their session cookies again before
+ * the next Chrome start would drop them. Returns a function that stops it. */
+export function startLoginKeeper(profile, { holder = profileHolder, sites = loadSites, keep = keepSiteCookies, every = 1000, unref = true, report = message => process.stderr.write(`${message}\n`) } = {}) {
+  let held = true, busy = false;
+  const tick = async () => {
+    if (busy) return;
+    busy = true;
+    try {
+      const pid = await holder(profile);
+      if (pid !== undefined) { held = true; return; }
+      if (!held) return;
+      held = false;
+      const known = await sites(profile);
+      if (known.length > 0) await keep(profile, known);
+    } catch (error) {
+      report(`personal-agent: could not keep browser logins: ${error?.message ?? error}`);
+    } finally {
+      busy = false;
+    }
+  };
+  const timer = setInterval(tick, every);
+  if (unref) timer.unref?.();
+  tick();
+  return () => clearInterval(timer);
 }
 
 function openChrome(args) {
@@ -156,8 +225,12 @@ export function saveOutputTool({ output, workspace, copy = copyFile, mkdirp = mk
   };
 }
 
+const keepers = new Map();
+
 export function apply(ctx, config) {
   const settings = loadSettings(config);
   ctx.tools.register(browserLoginTool({ profile: settings.browserProfile, log: actionLogger({ path: settings.actionLog }) }));
+  // One keeper per profile, however many times the plugin is applied.
+  if (!keepers.has(settings.browserProfile)) keepers.set(settings.browserProfile, startLoginKeeper(settings.browserProfile));
   ctx.tools.register(saveOutputTool({ output: settings.browserOutput, workspace: exec => exec.agent === undefined ? undefined : ctx.workingDirectory.ensure(exec.agent, exec.signal) }));
 }
