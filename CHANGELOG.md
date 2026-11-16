@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Logins made in the `browser_login` window now survive the next browser start. Sites such as Canvas sign in with session cookies, which Chrome drops when it starts (Playwright's Chrome never restores a session, so "continue where you left off" does not help). When the sign-in window quits, the plugin turns the session cookies used in it into cookies that last 30 days, in the assistant's profile only, and notes it in the action log.
+
 - `calendar_update` takes `repeat`: change an event's repeat rule from one occurrence on, end a series early with an earlier `until`, or `"none"` to keep that occurrence and drop the rest. The helper already supported this; the tool now passes it on. The card lists how many later occurrences drop off and when, a new rule is always saved for this and later occurrences, and the action log records the old and new rule.
 
 ## 0.21.7

@@ -3,10 +3,11 @@
 // on the same profile. The user signs in there and quits that window; the headless browser then
 // reuses the saved login. Chrome allows one process per profile, so this refuses while the
 // headless browser (or an earlier login window) still holds it.
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { copyFile, mkdir, readlink, stat } from 'node:fs/promises';
 import { basename, join } from 'node:path';
 import { loadSettings } from './config.js';
+import { actionLogger } from './log.js';
 
 export const name = 'personal-agent-browser';
 export const inject = ['tools', 'workingDirectory'];
@@ -36,6 +37,60 @@ export function loginUrl(value) {
  * encrypts cookies with a mock keychain on macOS. */
 export const chromeArgs = (profile, url) => ['-na', 'Google Chrome', '--args', `--user-data-dir=${profile}`, '--use-mock-keychain', '--password-store=basic', '--no-first-run', '--no-default-browser-check', ...url ? [url] : []];
 
+const KEEP_DAYS = 30;
+
+/** Turn the session cookies touched since `since` (a Date) into cookies that last KEEP_DAYS days,
+ * so a login survives the next browser start: Chrome drops session cookies when it starts, and
+ * Playwright's Chrome never restores a session. Values stay encrypted as they were. Run only while
+ * no Chrome holds the profile. Returns how many cookies changed. */
+export async function keepSessionCookies(profile, since, { sqlite = runSqlite, days = KEEP_DAYS } = {}) {
+  const from = Math.floor(since.getTime() / 1000);
+  // Chrome stores times as microseconds since 1601-01-01.
+  const sql = `update cookies set is_persistent = 1, has_expires = 1, expires_utc = (strftime('%s', 'now') + ${days * 86400} + 11644473600) * 1000000 where is_persistent = 0 and last_access_utc >= (${from} + 11644473600) * 1000000; select changes();`;
+  const out = await sqlite(join(profile, 'Default', 'Cookies'), sql);
+  return Number(String(out).trim().split('\n').at(-1)) || 0;
+}
+
+function runSqlite(file, sql) {
+  return new Promise((resolve, reject) => {
+    execFile('/usr/bin/sqlite3', ['-cmd', '.timeout 5000', file, sql], { timeout: 15000 }, (error, stdout, stderr) => error ? reject(new Error(String(stderr || error.message).trim())) : resolve(stdout));
+  });
+}
+
+/** After a sign-in window opens, wait for that Chrome to quit, then keep the logins made in it.
+ * Gives up if the window never takes the profile, if another Chrome takes it first, or after
+ * `limit` ms. Polls with an unref'd timer so it never keeps DSH running. */
+export function watchLoginWindow(profile, since, { holder = profileHolder, keep = keepSessionCookies, log = async () => {}, every = 1000, appear = 30000, limit = 3 * 3600 * 1000, alive = isAlive } = {}) {
+  return new Promise(resolve => {
+    const started = Date.now();
+    let window;
+    const done = value => { clearInterval(timer); resolve(value); };
+    const tick = async () => {
+      if (tick.busy) return;
+      tick.busy = true;
+      try {
+        const pid = await holder(profile);
+        if (window === undefined) {
+          if (pid !== undefined) window = pid;
+          else if (Date.now() - started > appear) return done({ kept: 0, reason: 'the sign-in window never opened the profile' });
+          return;
+        }
+        if (alive(window)) return Date.now() - started > limit ? done({ kept: 0, reason: 'the sign-in window stayed open too long' }) : undefined;
+        if (pid !== undefined) return done({ kept: 0, reason: `another Chrome (pid ${pid}) took the profile first` });
+        const kept = await keep(profile, since);
+        if (kept > 0) await log('browser_login', `保留登录：${kept} 个会话 cookie 改为 ${KEEP_DAYS} 天内有效`).catch(() => {});
+        done({ kept });
+      } catch (error) {
+        done({ kept: 0, reason: error?.message ?? String(error) });
+      } finally {
+        tick.busy = false;
+      }
+    };
+    const timer = setInterval(tick, every);
+    timer.unref?.();
+  });
+}
+
 function openChrome(args) {
   return new Promise((resolve, reject) => {
     const child = spawn('open', args, { stdio: 'ignore' });
@@ -44,7 +99,7 @@ function openChrome(args) {
   });
 }
 
-export function browserLoginTool({ profile, holder = profileHolder, launch = openChrome }) {
+export function browserLoginTool({ profile, holder = profileHolder, launch = openChrome, watch = watchLoginWindow, log }) {
   return {
     name: 'browser_login',
     description: 'Open the assistant browser\'s profile in a visible Google Chrome window so the user can sign in to a site (a school portal with two-step login, Gmail) that the headless mcp__browser__* tools hit a login page on. Call mcp__browser__browser_close first: the profile can be open in only one browser at a time. Then ask the user to sign in in that window and quit it with ⌘Q (the whole Chrome window, not just the tab) and to tell you when done; after that the mcp__browser__* tools reuse the saved login. Never type passwords or codes yourself.',
@@ -55,8 +110,12 @@ export function browserLoginTool({ profile, holder = profileHolder, launch = ope
       const url = loginUrl(args.url);
       const pid = await holder(profile);
       if (pid !== undefined) return { opened: false, reason: `the assistant browser profile is in use (Chrome pid ${pid}): call mcp__browser__browser_close first, or ask the user to quit an earlier sign-in window with ⌘Q, then try again` };
+      const since = new Date(Date.now() - 60000);
       await launch(chromeArgs(profile, url));
-      return { opened: true, url: url ?? null, next: 'ask the user to sign in in the new Chrome window, then quit it with ⌘Q and tell you; continue with the mcp__browser__* tools after that' };
+      // Sites like school portals sign in with session cookies, which Chrome would drop on the next
+      // start; once the user quits this window, keep the ones used here.
+      watch(profile, since, { holder, log }).then(result => { if (result.reason) process.stderr.write(`browser_login: logins not kept: ${result.reason}\n`); });
+      return { opened: true, url: url ?? null, next: 'ask the user to sign in in the new Chrome window, then quit it with ⌘Q and tell you; continue with the mcp__browser__* tools after that. When the window quits, its logins are kept for 30 days, also for sites that would normally sign you out when the browser closes.' };
     },
   };
 }
@@ -99,6 +158,6 @@ export function saveOutputTool({ output, workspace, copy = copyFile, mkdirp = mk
 
 export function apply(ctx, config) {
   const settings = loadSettings(config);
-  ctx.tools.register(browserLoginTool({ profile: settings.browserProfile }));
+  ctx.tools.register(browserLoginTool({ profile: settings.browserProfile, log: actionLogger({ path: settings.actionLog }) }));
   ctx.tools.register(saveOutputTool({ output: settings.browserOutput, workspace: exec => exec.agent === undefined ? undefined : ctx.workingDirectory.ensure(exec.agent, exec.signal) }));
 }

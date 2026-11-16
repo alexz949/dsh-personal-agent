@@ -129,7 +129,7 @@ On Apple Silicon with Homebrew, Node is usually `/opt/homebrew/bin/node`. Change
 
 The browser runs **headless**, so no window opens while the assistant works. It uses its own Chrome profile in `~/.dsh/mcp/playwright/profile` and never sees your everyday Chrome logins.
 
-When a site needs you to sign in (for example a two-step school login), the assistant closes the background browser and calls `browser_login`. That opens the same profile in a visible Google Chrome window. Sign in, quit that window with ⌘Q, and the background browser reuses the saved login from then on. You can also start this from **登录助手浏览器** at the bottom of the overview page. The profile path can be changed with `browserProfile` in the settings file.
+When a site needs you to sign in (for example a two-step school login), the assistant closes the background browser and calls `browser_login`. That opens the same profile in a visible Google Chrome window. Sign in, quit that window with ⌘Q, and the background browser reuses the saved login from then on. Many school portals sign in with session cookies, which Chrome drops on its next start; when the window quits, the plugin turns the session cookies used there into cookies that last 30 days (in the assistant's profile only, logged in the action log). The site can still end the session on its side, and two-step login may ask again. You can also start this from **登录助手浏览器** at the bottom of the overview page. The profile path can be changed with `browserProfile` in the settings file.
 
 To read pages the assistant links to without leaving DSH, set DSH's chat link preference to open links in the in-app sidebar. DSH's own sidebar browser is for you only: the model cannot see or control it.
 
