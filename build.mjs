@@ -16,7 +16,8 @@ await Promise.all(['notify', 'apple', 'arxiv', 'bib', 'log', 'config', 'home', '
 // rebuilt only when its sources change; an unchanged helper keeps the user's permission grants.
 const app = new URL('helper/PersonalAgentHelper.app/', root);
 const [swift, plist] = await Promise.all([read('helper/main.swift'), read('helper/Info.plist')]);
-const digest = createHash('sha256').update(swift).update(plist).digest('hex');
+// "universal" is part of the stamp so helpers built for one architecture are rebuilt once.
+const digest = createHash('sha256').update(swift).update(plist).update('universal').digest('hex');
 const stamp = new URL('helper/.build-sha256', root);
 const built = await readFile(stamp, 'utf8').catch(() => '');
 if (process.platform === 'darwin' && built.trim() !== digest) {
@@ -24,8 +25,15 @@ if (process.platform === 'darwin' && built.trim() !== digest) {
   await rm(app, { recursive: true, force: true });
   await mkdir(new URL('Contents/MacOS/', app), { recursive: true });
   await copyFile(new URL('helper/Info.plist', root), new URL('Contents/Info.plist', app));
-  const arch = process.arch === 'arm64' ? 'arm64' : 'x86_64';
-  execFileSync('swiftc', ['-O', '-swift-version', '5', '-target', `${arch}-apple-macos14.0`, path(new URL('helper/main.swift', root)), '-o', path(new URL('Contents/MacOS/PersonalAgentHelper', app))], { stdio: 'inherit' });
+  // One universal binary for Apple silicon and Intel Macs, so the published package runs on both.
+  const binary = path(new URL('Contents/MacOS/PersonalAgentHelper', app));
+  const slices = ['arm64', 'x86_64'].map(arch => {
+    const out = `${binary}-${arch}`;
+    execFileSync('swiftc', ['-O', '-swift-version', '5', '-target', `${arch}-apple-macos14.0`, path(new URL('helper/main.swift', root)), '-o', out], { stdio: 'inherit' });
+    return out;
+  });
+  execFileSync('lipo', ['-create', ...slices, '-output', binary], { stdio: 'inherit' });
+  await Promise.all(slices.map(slice => rm(slice, { force: true })));
   execFileSync('codesign', ['--force', '--sign', '-', path(app)], { stdio: 'inherit' });
   await writeFile(stamp, `${digest}\n`);
 }

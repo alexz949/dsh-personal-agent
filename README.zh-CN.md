@@ -47,7 +47,11 @@
   - 启动先显示开场画面，然后直接进入主对话，并收起左边栏。
   - “助理”总览页显示今日要点、最近对话和最近替你做的事。
 
-## 安装（从源码）
+## 安装
+
+**从 npm 安装（推荐）**：在 DSH 的“插件 → 添加插件”里输入 `dsh-personal-agent`，装好后重启 DSH。也可以把 `https://raw.githubusercontent.com/alexz949/dsh-personal-agent/main/market.json` 加为“发现”里的索引源（需要先打开实验性的自定义插件市场）。
+
+**从源码安装**
 
 需要 macOS 14+、DSH 桌面版 `0.2.2-rc.3` 或之后的 `0.2.x`、Node.js 20+，以及 Xcode 命令行工具（`xcode-select --install`）。
 

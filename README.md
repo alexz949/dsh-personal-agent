@@ -60,7 +60,7 @@ It also uses DSH's own tools: files, web search, bash in the DSH sandbox, schedu
 
 ## Install
 
-### From source (for now)
+### From source
 
 ```bash
 git clone https://github.com/alexz949/dsh-personal-agent.git
@@ -79,7 +79,17 @@ With a link, updating is `git pull && npm run build`, then restart DSH. `dsh plu
 
 ### From npm
 
-Not published yet. Once it is: `dsh plugin --profile desktop add dsh-personal-agent`.
+In DSH, open **Plugins → Add plugin** and enter `dsh-personal-agent`, or run:
+
+```bash
+"/Applications/DeepSeek Harness.app/Contents/Resources/runtime/cli/bin/dsh" plugin --profile desktop add dsh-personal-agent
+```
+
+Restart DSH afterwards. The package includes a prebuilt universal helper (Apple silicon and Intel).
+
+### From a plugin index
+
+Add `https://raw.githubusercontent.com/alexz949/dsh-personal-agent/main/market.json` as an index source under **Plugins → Discover** (DSH's experimental custom plugin market), then install from there.
 
 ## First run
 

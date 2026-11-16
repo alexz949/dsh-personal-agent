@@ -10,7 +10,7 @@ import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
-const SERVER = { name: 'personal-agent', version: '0.21.5' };
+const SERVER = { name: 'personal-agent', version: '0.21.6' };
 const SOURCES = ['../src/apple.js', '../src/notify.js', '../src/arxiv.js', '../src/bib.js', '../src/log.js', '../src/config.js'].map(path => new URL(path, import.meta.url));
 
 /** Load the tool modules; a new version string imports a fresh copy of files that were edited. */

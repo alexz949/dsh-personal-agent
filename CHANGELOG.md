@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.6
+
+- First npm release. The helper is now a universal binary (Apple silicon and Intel), and the package can also be found through a plugin index (`market.json`).
+
 ## 0.21.5
 
 - The 傲娇 prompt is replaced by the user's restructured version: persona, four interaction rules, and rhythm examples to internalize rather than copy.

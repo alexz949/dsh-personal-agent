@@ -1,6 +1,6 @@
 {
   "name": "dsh-personal-agent",
-  "version": "0.21.5",
+  "version": "0.21.6",
   "description": "A personal assistant for DeepSeek Harness (DSH) on macOS: Apple Calendar, Reminders, Notes and Mail (read and drafts, never sends), a 今日 sticky note, a weekly work journal, arXiv and BibTeX helpers, personalities, and a home that DSH opens on.",
   "keywords": [
     "dsh",
