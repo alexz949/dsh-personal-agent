@@ -15,7 +15,7 @@ These tools act as soon as the model calls them, so the assistant can work witho
 | `bib_add` | appends to the BibTeX file named in settings, and only when one is set |
 | `task_create`, `task_update` | `tasks.json` in `~/.dsh/personal-agent/`; may add a to-do to, or tick one off in, the assistant Reminders list |
 
-Creating calendar events and general reminders, and changing or moving any existing event or reminder, always needs your confirmation in DSH, on a card that shows the old and new values. Deleting events, reminders or notes is not offered at all.
+Creating calendar events and general reminders, changing or moving any existing event or reminder, and deleting an event (`calendar_delete`, the only tool that deletes anything in the Apple apps) always needs your confirmation in DSH, on a card that shows the old and new values. Deleting events, reminders or notes is not offered at all.
 
 ## Files it writes
 
@@ -23,6 +23,7 @@ Creating calendar events and general reminders, and changing or moving any exist
 - `~/.dsh/personal-agent/actions.md`, the action log, and `~/.dsh/personal-agent/tasks.json`, task links and context.
 - Your BibTeX library, if configured.
 - Mail drafts and Notes in the assistant folder, through the Apple apps.
+- In the assistant browser's profile (`~/.dsh/mcp/playwright/profile`): after you sign in through `browser_login`, session cookies of the sites you signed in to are made to last 30 days, and those sites are listed in `personal-agent-kept-sites.json` there.
 
 ## Network
 

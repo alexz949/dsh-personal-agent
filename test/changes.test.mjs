@@ -131,6 +131,33 @@ test('calendar_update ends a series sooner or stops it after one occurrence, and
   assert.doesNotMatch(plain.asked[0].questions[0].detail, /不再出现/);
 });
 
+test('calendar_delete asks first, deletes one occurrence or this and later ones, and refuses without a span on a series', async () => {
+  const office = DAY[2];
+  const one = fake({ selected: ['删除'] });
+  await one.tools.calendar_delete.execute({ id: 'e3', occurrence: office.start }, exec);
+  assert.deepEqual(one.runs.at(-1), { op: 'calendar.delete', id: 'e3', occurrence: office.start });
+  const card = one.asked[0].questions[0];
+  assert.deepEqual(card.options.map(option => option.label), ['删除', '取消']);
+  assert.match(card.detail, /日程：Office hour（Work）\n时间：11月17日（周二）10:00 至 11月17日（周二）12:00\n删除后不能在日历里撤销。/);
+
+  const rule = { frequency: 'weekly', interval: 1, until: '2026-12-14' };
+  const series = ['2026-11-16', '2026-11-23', '2026-11-30', '2026-12-07', '2026-12-14'].map(day => ({ id: 'w1', title: '周会', start: `${day}T21:30:00-05:00`, end: `${day}T22:30:00-05:00`, all_day: false, calendar: 'Work', repeat: rule }));
+  const later = fake({ selected: ['删除'] }, { events: series });
+  await assert.rejects(later.tools.calendar_delete.execute({ id: 'w1', occurrence: series[1].start }, exec), /span/);
+  await later.tools.calendar_delete.execute({ id: 'w1', occurrence: series[1].start, span: 'future' }, exec);
+  assert.deepEqual(later.runs.at(-1), { op: 'calendar.delete', id: 'w1', occurrence: series[1].start, span: 'future' });
+  assert.match(later.asked[0].questions[0].detail, /范围：本次及以后的所有重复（每周，到 2026-12-14 为止）\n⚠️ 共删除 4 次：11月23日（周一）21:30 至 12月14日（周一）21:30/);
+
+  const skip = fake({ selected: ['删除'] }, { events: series });
+  await skip.tools.calendar_delete.execute({ id: 'w1', occurrence: series[2].start, span: 'this' }, exec);
+  assert.equal(skip.runs.at(-1).span, 'this');
+  assert.match(skip.asked[0].questions[0].detail, /范围：仅这一次，其他照常/);
+
+  const no = fake({ selected: ['取消'] }, { events: series });
+  assert.equal((await no.tools.calendar_delete.execute({ id: 'w1', occurrence: series[0].start, span: 'future' }, exec)).deleted, false);
+  assert.ok(no.runs.every(request => request.op !== 'calendar.delete'));
+});
+
 test('creating with a repeat rule passes it on and shows it on the card; a repeating reminder needs a due time', async () => {
   const runs = [], asked = [];
   const tools = Object.fromEntries(appleTools({ run: async request => { runs.push(request); return request.op === 'calendar.events' ? { events: DAY } : { created: true }; }, questions: () => ({ ask: async request => { asked.push(request); return { answers: [{ id: 'confirm', selected: ['创建'] }] }; } }) }).map(tool => [tool.name, tool]));

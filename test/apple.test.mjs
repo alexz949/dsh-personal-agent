@@ -133,8 +133,8 @@ test('built apple module registers its tools through the preset subpath', async 
   const plugin = await import('../lib/apple.js');
   const registered = [];
   plugin.apply({ tools: { register: tool => registered.push(tool.name) }, get: () => undefined });
-  assert.equal(registered.length, 16);
-  assert.equal(registered.slice(-4).join(), 'todo_add,reminders_complete,reminders_update,calendar_update');
+  assert.equal(registered.length, 17);
+  assert.equal(registered.slice(-4).join(), 'reminders_complete,reminders_update,calendar_update,calendar_delete');
   assert.equal(pkg.exports['./arxiv'], './lib/arxiv.js');
   const arxiv = [];
   (await import('../lib/arxiv.js')).apply({ tools: { register: tool => arxiv.push(tool.name) } });

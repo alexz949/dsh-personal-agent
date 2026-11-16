@@ -119,6 +119,6 @@ test('edited tool files are reloaded and the client is told the list changed', a
 test('the real tool files load, and a new version imports a fresh copy', async () => {
   const first = await loadTools(() => undefined);
   const second = await loadTools(() => undefined, 'test-version');
-  assert.deepEqual(first.map(tool => tool.name), ['calendar_events', 'calendar_create', 'reminders_list', 'reminders_create', 'notes_search', 'notes_read', 'mail_accounts', 'mail_list', 'mail_read', 'mail_draft', 'mail_reply_draft', 'notes_create', 'todo_add', 'reminders_complete', 'reminders_update', 'calendar_update', 'notify', 'arxiv_search']);
+  assert.deepEqual(first.map(tool => tool.name), ['calendar_events', 'calendar_create', 'reminders_list', 'reminders_create', 'notes_search', 'notes_read', 'mail_accounts', 'mail_list', 'mail_read', 'mail_draft', 'mail_reply_draft', 'notes_create', 'todo_add', 'reminders_complete', 'reminders_update', 'calendar_update', 'calendar_delete', 'notify', 'arxiv_search']);
   assert.notEqual(first[0].execute, second[0].execute);
 });

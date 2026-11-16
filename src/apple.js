@@ -490,6 +490,49 @@ export function changeTools({ run = runHelper, questions = () => undefined } = {
         return { ...await run({ op: 'calendar.update', id, occurrence: current.start, ...span ? { span } : {}, ...start ? { start, end } : {}, ...title ? { title } : {}, ...location !== undefined ? { location } : {}, ...repeat ? { repeat } : {} }, exec.signal), ...clash.result, ...cut.result };
       },
     }),
+    tool({
+      name: 'calendar_delete',
+      description: 'Delete an event from Apple Calendar, only when the user asks for it: cancel a meeting, skip one week of a repeating event (span "this"), or remove a repeating event from this occurrence on (span "future"; on its first occurrence that is the whole series). Pass id and occurrence (the start time exactly as calendar_events returned it); span is required for a repeating event. The user always confirms first on a card showing the event and, for a series, how many occurrences go; nothing is deleted unless they choose 删除. A deleted event cannot be restored from Calendar.',
+      properties: {
+        id: { type: 'string' },
+        occurrence: { type: 'string', description: 'The event\'s start as calendar_events returned it.' },
+        span: { type: 'string', enum: ['this', 'future'] },
+      },
+      required: ['id', 'occurrence'],
+      card: { title: '删除日程', kind: 'edit', text: args => String(args.occurrence ?? '') },
+      async execute(args, exec) {
+        const id = required(args.id, 'id');
+        const occurrence = normalizeWhen(args.occurrence, 'occurrence');
+        const day = dayOf(occurrence);
+        const { events } = await run({ op: 'calendar.events', start: day, end: day }, exec.signal);
+        const current = events.find(event => event.id === id && (event.start === occurrence || Date.parse(event.start) === Date.parse(occurrence)));
+        if (!current) throw new Error('no event with this id starts at that time; use calendar_events to look it up again');
+        if (current.repeat && !args.span) throw new Error('this event repeats: pass span "this" (only this occurrence) or "future" (this and later occurrences)');
+        const span = current.repeat ? args.span : undefined;
+        const lines = [
+          `日程：${current.title}（${current.calendar}）`,
+          `时间：${describeWhen(current.start)} 至 ${describeWhen(current.end)}`,
+          current.location && `地点：${current.location}`,
+          current.repeat && `范围：${span === 'future' ? '本次及以后的所有重复' : '仅这一次，其他照常'}（${describeRepeat(current.repeat)}）`,
+        ];
+        if (span === 'future') {
+          if (!current.repeat.until) lines.push('⚠️ 这一次和以后的所有重复都会删除。');
+          else {
+            try {
+              const { events: later } = await run({ op: 'calendar.events', start: day, end: current.repeat.until }, exec.signal);
+              const gone = later.filter(event => event.id === id && dayOf(event.start) >= day).sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+              lines.push(gone.length > 1 ? `⚠️ 共删除 ${gone.length} 次：${describeWhen(gone[0].start)} 至 ${describeWhen(gone.at(-1).start)}` : '⚠️ 这一次和以后的所有重复都会删除。');
+            } catch (error) {
+              lines.push(`⚠️ 这一次和以后的所有重复都会删除（没能列出具体几次：${error?.message ?? error}）`);
+            }
+          }
+        }
+        lines.push('删除后不能在日历里撤销。');
+        const decision = await confirm(questions(), exec, '删除日程', '删除这个日程？', lines, { label: '删除', description: '按以上范围删除' }, '保留');
+        if (!decision.approved) return { deleted: false, ...decision.feedback ? { user_feedback: decision.feedback } : { reason: 'the user did not confirm' }, event: current };
+        return run({ op: 'calendar.delete', id, occurrence: current.start, ...span ? { span } : {} }, exec.signal);
+      },
+    }),
   ];
 }
 

@@ -39,6 +39,16 @@ test('a calendar change to the repeat rule logs the old and new rule and how man
   assert.deepEqual(lines, ['修改日程：周会（2026-11-16T21:30:00-05:00 → 2026-11-16T21:30:00-05:00，本次及以后，重复：每周，到 2026-12-14 为止 → 每周，到 2026-11-16 为止，之后 4 次不再出现）']);
 });
 
+test('deleting an event logs what went and how much of a series', async () => {
+  const lines = [];
+  const tools = withLog([
+    fake('calendar_delete', { deleted: true, span: 'this', event: { title: '组会', start: '2026-11-23T15:00:00-05:00', recurring: true } }),
+    fake('calendar_delete', { deleted: false, reason: 'the user did not confirm' }),
+  ], async (_tool, text) => { lines.push(text); });
+  for (const tool of tools) await tool.execute({}, exec);
+  assert.deepEqual(lines, ['删除日程：组会（2026-11-23T15:00:00-05:00，仅这一次）']);
+});
+
 test('a failed log write never fails the action, and lines append to the file', async () => {
   const broken = withLog([fake('notes_create', { created: true, folder: '助手', title: 't' })], async () => { throw new Error('disk full'); });
   assert.deepEqual(await broken[0].execute({}, exec), { created: true, folder: '助手', title: 't' });

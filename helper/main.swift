@@ -230,8 +230,9 @@ func calendarCreate(_ input: [String: Any]) async throws -> [String: Any] {
 // Changes one event, or with span "future" a repeating event from this occurrence on. "occurrence"
 // (the start of the occurrence, as calendar_events returns it) picks the occurrence of a repeating
 // event; a repeating event needs an explicit span. Moving only the start keeps the duration.
-func calendarUpdate(_ input: [String: Any]) async throws -> [String: Any] {
-  try await requireAccess(.event)
+/// The event (or, with occurrence, that one occurrence of a repeating event) and the span a change
+/// to it covers. A repeating event needs span "this" or "future".
+func eventAndSpan(_ input: [String: Any]) throws -> (EKEvent, EKSpan) {
   let id = try requiredText(input["id"], "id")
   guard let first = store.event(withIdentifier: id) else { throw HelperError(code: "not_found", message: "找不到这个日程，它可能已被删除。先用 calendar_events 查最新的 id。") }
   var event: EKEvent = first
@@ -244,12 +245,16 @@ func calendarUpdate(_ input: [String: Any]) async throws -> [String: Any] {
   guard event.calendar.allowsContentModifications else { throw invalid("日历“\(event.calendar.title)”不能修改") }
   let spanName = try optionalText(input["span"], "span")
   if event.hasRecurrenceRules && spanName == nil { throw invalid("this event repeats: pass span \"this\" (only this occurrence) or \"future\" (this and later occurrences)") }
-  let span: EKSpan
   switch spanName {
-  case nil, "this": span = .thisEvent
-  case "future": span = .futureEvents
+  case nil, "this": return (event, .thisEvent)
+  case "future": return (event, .futureEvents)
   default: throw invalid("span must be this or future")
   }
+}
+
+func calendarUpdate(_ input: [String: Any]) async throws -> [String: Any] {
+  try await requireAccess(.event)
+  let (event, span) = try eventAndSpan(input)
   let before = eventView(event)
   if let title = try optionalText(input["title"], "title") { event.title = title }
   if input.keys.contains("location") { event.location = try optionalText(input["location"], "location") }
@@ -269,6 +274,16 @@ func calendarUpdate(_ input: [String: Any]) async throws -> [String: Any] {
   }
   try store.save(event, span: span, commit: true)
   return ["updated": true, "span": span == .futureEvents ? "future" : "this", "before": before, "event": eventView(event)]
+}
+
+/// Delete one event, one occurrence ("this") or this and every later occurrence ("future"; on the
+/// first occurrence that is the whole series). The caller has already had the user confirm.
+func calendarDelete(_ input: [String: Any]) async throws -> [String: Any] {
+  try await requireAccess(.event)
+  let (event, span) = try eventAndSpan(input)
+  let before = eventView(event)
+  try store.remove(event, span: span, commit: true)
+  return ["deleted": true, "span": span == .futureEvents ? "future" : "this", "event": before]
 }
 
 func remindersList(_ input: [String: Any]) async throws -> [String: Any] {
@@ -764,6 +779,7 @@ do {
   case "reminders.complete": data = try await remindersComplete(request)
   case "reminders.update": data = try await remindersUpdate(request)
   case "calendar.update": data = try await calendarUpdate(request)
+  case "calendar.delete": data = try await calendarDelete(request)
   case "mail.meta": data = try mailMeta(request)
   case "mail.reply_status": data = try mailReplyStatus(request)
   case "notes.search": data = try notesSearch(request)
