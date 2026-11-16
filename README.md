@@ -32,6 +32,7 @@ A personal assistant plugin for DeepSeek Harness (DSH) on macOS. It adds a **Per
 - **Rescheduling and repeats.**
   - Move reminders and events (`reminders_update`, `calendar_update`), including "remind me tomorrow" or "push it a week" as relative moves that keep the time of day across daylight-saving changes. A moved reminder no longer rings at its old time.
   - Daily, weekly, monthly or yearly repeats with an end date or a count; for a repeating event you choose "only this one" or "this and later ones".
+  - End a repeating event early, or keep one occurrence and stop the rest (`calendar_update` with `repeat`). The card says how many later occurrences drop off. This is the only way the plugin removes events.
   - Every change shows the old and new values on a confirmation card, with overlapping events and free slots that day. The same request sent twice does not create a second event or reminder.
 - **Weekly journal.**
   - One Markdown file per week (`journal/2026/2026-W46.md`) with a section per day.
@@ -138,7 +139,7 @@ To read pages the assistant links to without leaving DSH, set DSH's chat link pr
 |---|---|---|
 | `calendar_events`, `reminders_list`, `notes_search`, `notes_read`, `mail_accounts`, `mail_list`, `mail_read` | read | no |
 | `calendar_create`, `reminders_create` | create an event / reminder (optionally repeating; shows conflicts) | **yes** (DSH card) |
-| `reminders_update`, `calendar_update` | change or move a reminder / event | **yes** (old and new values) |
+| `reminders_update`, `calendar_update` | change or move a reminder / event, change its repeat rule or end a series early | **yes** (old and new values, and what drops off) |
 | `task_create`, `task_update`, `task_list` | record and track tasks linked to reminders and emails | no |
 | `todo_add` | add a to-do to the assistant list | no |
 | `reminders_complete` | mark a reminder done | no for the assistant list, **yes** for others |

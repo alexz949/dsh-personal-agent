@@ -353,8 +353,7 @@ export function appleTools({ run = runHelper, questions = () => undefined, notes
  * is said on the card instead of looking like a free slot. */
 export async function checkConflicts(run, exec, start, end, ignore) {
   try {
-    const day = value => value.length === 10 ? value : localDayOf(new Date(value));
-    const { events } = await run({ op: 'calendar.events', start: day(start), end: day(end) }, exec.signal);
+    const { events } = await run({ op: 'calendar.events', start: dayOf(start), end: dayOf(end) }, exec.signal);
     const found = conflicts(events, start, end, { ignore });
     if (found.length === 0) return { lines: [], result: { conflicts: [] } };
     const slots = freeSlots(events, start, end, { ignore });
@@ -364,6 +363,32 @@ export async function checkConflicts(run, exec, start, end, ignore) {
     };
   } catch (error) {
     return { lines: [`（没能检查日历冲突：${error?.message ?? error}）`], result: { conflicts: null, conflict_check_failed: true } };
+  }
+}
+
+const dayOf = value => value.length === 10 ? value : localDayOf(new Date(value));
+
+/** What a new repeat rule takes off the calendar, worded for the confirmation card. Only a rule
+ * that ends the series sooner removes occurrences: "none" drops everything after this one, and the
+ * same rhythm with an earlier until drops everything after that day. With an old end date the
+ * dropped occurrences are listed; an open-ended series is said to lose all later repeats. */
+export async function seriesCut(run, exec, current, repeat, day) {
+  const old = current.repeat;
+  if (!old) return { lines: [], result: {} };
+  const ending = repeat === 'none' || (repeat.until && repeat.frequency === old.frequency && (repeat.interval ?? 1) === (old.interval ?? 1));
+  if (!ending) return { lines: [], result: {} };
+  const after = repeat === 'none' ? day : repeat.until;
+  if (old.until && old.until <= after) return { lines: [], result: {} };
+  const later = repeat === 'none' ? '这一次之后' : `${after} 之后`;
+  if (!old.until) return { lines: [`⚠️ ${later}的所有重复都不再出现。`], result: {} };
+  try {
+    const { events } = await run({ op: 'calendar.events', start: shiftWhen(after, { days: 1 }), end: old.until }, exec.signal);
+    const gone = events.filter(event => event.id === current.id && dayOf(event.start) > after).sort((a, b) => Date.parse(a.start) - Date.parse(b.start));
+    if (gone.length === 0) return { lines: [], result: { dropped_occurrences: [] } };
+    const range = gone.length === 1 ? describeWhen(gone[0].start) : `${describeWhen(gone[0].start)} 至 ${describeWhen(gone.at(-1).start)}`;
+    return { lines: [`⚠️ ${later}的 ${gone.length} 次不再出现：${range}`], result: { dropped_occurrences: gone.map(event => event.start) } };
+  } catch (error) {
+    return { lines: [`⚠️ ${later}的重复都不再出现（没能列出具体几次：${error?.message ?? error}）`], result: {} };
   }
 }
 
@@ -409,7 +434,7 @@ export function changeTools({ run = runHelper, questions = () => undefined } = {
     }),
     tool({
       name: 'calendar_update',
-      description: 'Move or change an event in Apple Calendar: start/end time, title or location. Pass id and occurrence (the start time exactly as calendar_events returned it). Use postpone (e.g. { days: 1 }, { weeks: 1 }) to move it relative to its current time, keeping its length and time of day; or start (and optionally end; moving only the start keeps the length). For a repeating event, span is required: "this" changes only this occurrence, "future" this and all later ones. The card shows the old and new values and any overlapping events with free slots that day; nothing changes unless the user chooses 修改.',
+      description: 'Move or change an event in Apple Calendar: start/end time, title, location or repeat rule. Pass id and occurrence (the start time exactly as calendar_events returned it). Use postpone (e.g. { days: 1 }, { weeks: 1 }) to move it relative to its current time, keeping its length and time of day; or start (and optionally end; moving only the start keeps the length). For a repeating event, span is required: "this" changes only this occurrence, "future" this and all later ones. repeat sets the rule from this occurrence on (span "future" on a repeating event): { frequency, interval?, until? | count? }, or "none" to keep this occurrence as a one-off and drop every later one. To stop a series after a date, pass the last occurrence that should stay, span "future", and the same frequency and interval with until set to that occurrence\'s day: every later occurrence disappears (there is no tool that deletes events). The card shows the old and new values, how many occurrences a shorter series drops, and any overlapping events with free slots that day; nothing changes unless the user chooses 修改.',
       properties: {
         id: { type: 'string' },
         occurrence: { type: 'string', description: 'The event\'s start as calendar_events returned it.' },
@@ -419,13 +444,14 @@ export function changeTools({ run = runHelper, questions = () => undefined } = {
         postpone: { type: 'object', description: '{ minutes?, hours?, days?, weeks?, months? }.' },
         title: { type: 'string' },
         location: { type: 'string' },
+        repeat: { description: 'A repeat rule like { frequency: "weekly", until: "2026-12-14" } from this occurrence on, or "none" to stop repeating after it.' },
       },
       required: ['id', 'occurrence'],
       card: { title: '修改日程', kind: 'edit', text: args => String(args.title ?? args.occurrence ?? '') },
       async execute(args, exec) {
         const id = required(args.id, 'id');
         const occurrence = normalizeWhen(args.occurrence, 'occurrence');
-        const day = occurrence.length === 10 ? occurrence : localDayOf(new Date(occurrence));
+        const day = dayOf(occurrence);
         const { events } = await run({ op: 'calendar.events', start: day, end: day }, exec.signal);
         const current = events.find(event => event.id === id && (event.start === occurrence || Date.parse(event.start) === Date.parse(occurrence)));
         if (!current) throw new Error('no event with this id starts at that time; use calendar_events to look it up again');
@@ -440,18 +466,28 @@ export function changeTools({ run = runHelper, questions = () => undefined } = {
           ? shiftWhen(current.end, { days: Math.round((Date.parse(start) - Date.parse(current.start)) / 864e5) })
           : shiftWhen(start, { minutes: Math.round((Date.parse(current.end) - Date.parse(current.start)) / 60000) });
         const title = text(args.title), location = args.location === undefined ? undefined : String(args.location);
-        if (!start && !title && location === undefined) throw new Error('nothing to change: pass start, end, postpone, title or location');
+        const repeat = readRepeat(args.repeat, { allowNone: true });
+        if (repeat === 'none' && !current.repeat) throw new Error('this event does not repeat');
+        if (repeat && current.repeat && args.span !== 'future') throw new Error('a repeat rule applies from this occurrence on: pass span "future"');
+        if (repeat?.until && repeat.until < day) throw new Error(`repeat.until is before this occurrence (${day}); to end the series sooner, pass the last occurrence that should stay`);
+        if (!start && !title && location === undefined && !repeat) throw new Error('nothing to change: pass start, end, postpone, title, location or repeat');
+        // EventKit changes a rule from the saved occurrence on, so a new rule is always saved as "future".
+        const span = repeat ? 'future' : args.span;
         const clash = start ? await checkConflicts(run, exec, start, end, id) : { lines: [], result: {} };
+        const cut = repeat ? await seriesCut(run, exec, current, repeat, day) : { lines: [], result: {} };
         const decision = await confirm(questions(), exec, '修改日程', '这样修改这个日程？', [
           `日程：${current.title}（${current.calendar}）`,
           start && `时间：${describeWhen(current.start)} 至 ${describeWhen(current.end)} → ${describeWhen(start)} 至 ${describeWhen(end)}`,
           title && `标题：${current.title} → ${title}`,
           location !== undefined && `地点：${current.location ?? '无'} → ${location || '无'}`,
-          current.repeat && `范围：${args.span === 'future' ? '本次及以后的所有重复' : '仅这一次'}（${describeRepeat(current.repeat)}）`,
+          current.repeat && `范围：${span === 'future' ? '本次及以后的所有重复' : '仅这一次'}（${describeRepeat(current.repeat)}）`,
+          repeat && `重复：${describeRepeat(current.repeat)} → ${describeRepeat(repeat)}（从这一次起）`,
+          repeat === 'none' && '这一次保留为单次日程。',
+          ...cut.lines,
           ...clash.lines,
         ], { label: '修改', description: '按以上内容修改' }, '保持不变');
         if (!decision.approved) return { updated: false, ...decision.feedback ? { user_feedback: decision.feedback } : { reason: 'the user did not confirm' }, event: current, ...clash.result };
-        return { ...await run({ op: 'calendar.update', id, occurrence: current.start, ...args.span ? { span: args.span } : {}, ...start ? { start, end } : {}, ...title ? { title } : {}, ...location !== undefined ? { location } : {} }, exec.signal), ...clash.result };
+        return { ...await run({ op: 'calendar.update', id, occurrence: current.start, ...span ? { span } : {}, ...start ? { start, end } : {}, ...title ? { title } : {}, ...location !== undefined ? { location } : {}, ...repeat ? { repeat } : {} }, exec.signal), ...clash.result, ...cut.result };
       },
     }),
   ];

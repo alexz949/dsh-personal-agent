@@ -96,6 +96,41 @@ test('calendar_update keeps the length, asks for a span on repeating events, and
   await assert.rejects(no.tools.calendar_update.execute({ id: 'nope', occurrence: office.start, title: 'x' }, exec), /no event with this id/);
 });
 
+test('calendar_update ends a series sooner or stops it after one occurrence, and the card lists what drops off', async () => {
+  const rule = { frequency: 'weekly', interval: 1, until: '2026-12-14' };
+  const series = ['2026-11-16', '2026-11-23', '2026-11-30', '2026-12-07', '2026-12-14'].map(day => ({ id: 'w1', title: '周会', start: `${day}T21:30:00-05:00`, end: `${day}T22:30:00-05:00`, all_day: false, calendar: 'Work', repeat: rule }));
+
+  const end = fake({ selected: ['修改'] }, { events: series });
+  const result = await end.tools.calendar_update.execute({ id: 'w1', occurrence: series[0].start, span: 'future', repeat: { frequency: 'weekly', until: '2026-11-16' } }, exec);
+  assert.deepEqual(end.writes(), [{ op: 'calendar.update', id: 'w1', occurrence: series[0].start, span: 'future', repeat: { frequency: 'weekly', until: '2026-11-16' } }]);
+  assert.deepEqual(end.runs.filter(request => request.op === 'calendar.events').at(-1), { op: 'calendar.events', start: '2026-11-17', end: '2026-12-14' });
+  assert.deepEqual(result.dropped_occurrences, series.slice(1).map(event => event.start));
+  assert.match(end.asked[0].questions[0].detail, /范围：本次及以后的所有重复（每周，到 2026-12-14 为止）\n重复：每周，到 2026-12-14 为止 → 每周，到 2026-11-16 为止（从这一次起）\n⚠️ 2026-11-16 之后的 4 次不再出现：11月23日（周一）21:30 至 12月14日（周一）21:30/);
+
+  const stop = fake({ selected: ['修改'] }, { events: series });
+  await stop.tools.calendar_update.execute({ id: 'w1', occurrence: series[1].start, span: 'future', repeat: 'none' }, exec);
+  assert.equal(stop.writes()[0].repeat, 'none');
+  assert.match(stop.asked[0].questions[0].detail, /重复：每周，到 2026-12-14 为止 → 取消重复（从这一次起）\n这一次保留为单次日程。\n⚠️ 这一次之后的 3 次不再出现：11月30日（周一）21:30 至 12月14日（周一）21:30/);
+
+  const open = fake({ selected: ['修改'] }, { events: series.map(event => ({ ...event, repeat: { frequency: 'weekly', interval: 1 } })) });
+  await open.tools.calendar_update.execute({ id: 'w1', occurrence: series[0].start, span: 'future', repeat: { frequency: 'weekly', until: '2026-11-16' } }, exec);
+  assert.match(open.asked[0].questions[0].detail, /⚠️ 2026-11-16 之后的所有重复都不再出现。/);
+
+  const declined = fake({ selected: ['取消'] }, { events: series });
+  assert.equal((await declined.tools.calendar_update.execute({ id: 'w1', occurrence: series[0].start, span: 'future', repeat: 'none' }, exec)).updated, false);
+  assert.deepEqual(declined.writes(), []);
+
+  await assert.rejects(end.tools.calendar_update.execute({ id: 'w1', occurrence: series[0].start, span: 'this', repeat: 'none' }, exec), /span "future"/);
+  await assert.rejects(end.tools.calendar_update.execute({ id: 'w1', occurrence: series[1].start, span: 'future', repeat: { frequency: 'weekly', until: '2026-11-16' } }, exec), /before this occurrence/);
+
+  const plain = fake({ selected: ['修改'] });
+  await assert.rejects(plain.tools.calendar_update.execute({ id: 'e3', occurrence: DAY[2].start, repeat: 'none' }, exec), /does not repeat/);
+  await plain.tools.calendar_update.execute({ id: 'e3', occurrence: DAY[2].start, repeat: { frequency: 'weekly', count: 4 } }, exec);
+  assert.deepEqual(plain.writes(), [{ op: 'calendar.update', id: 'e3', occurrence: DAY[2].start, span: 'future', repeat: { frequency: 'weekly', count: 4 } }]);
+  assert.match(plain.asked[0].questions[0].detail, /重复：不重复 → 每周，共 4 次（从这一次起）/);
+  assert.doesNotMatch(plain.asked[0].questions[0].detail, /不再出现/);
+});
+
 test('creating with a repeat rule passes it on and shows it on the card; a repeating reminder needs a due time', async () => {
   const runs = [], asked = [];
   const tools = Object.fromEntries(appleTools({ run: async request => { runs.push(request); return request.op === 'calendar.events' ? { events: DAY } : { created: true }; }, questions: () => ({ ask: async request => { asked.push(request); return { answers: [{ id: 'confirm', selected: ['创建'] }] }; } }) }).map(tool => [tool.name, tool]));

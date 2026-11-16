@@ -1,5 +1,9 @@
 # Changelog
 
+## Unreleased
+
+- `calendar_update` takes `repeat`: change an event's repeat rule from one occurrence on, end a series early with an earlier `until`, or `"none"` to keep that occurrence and drop the rest. The helper already supported this; the tool now passes it on. The card lists how many later occurrences drop off and when, a new rule is always saved for this and later occurrences, and the action log records the old and new rule.
+
 ## 0.21.7
 
 - Fix `content.some is not a function` on today_update, journal_status, journal_write, task_create, task_update, task_list and browser_save_output: their output render now returns content blocks, as DSH 0.2.x expects. A test keeps every tool on that format.

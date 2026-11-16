@@ -31,6 +31,14 @@ test('only real changes by write tools are logged, one line each with the local 
   ]);
 });
 
+test('a calendar change to the repeat rule logs the old and new rule and how many occurrences dropped', async () => {
+  const lines = [];
+  const before = { title: '周会', start: '2026-11-16T21:30:00-05:00', repeat: { frequency: 'weekly', interval: 1, until: '2026-12-14' } };
+  const [tool] = withLog([fake('calendar_update', { updated: true, span: 'future', before, event: { ...before, repeat: { ...before.repeat, until: '2026-11-16' } }, dropped_occurrences: ['a', 'b', 'c', 'd'] })], async (_tool, text) => { lines.push(text); });
+  await tool.execute({ repeat: { frequency: 'weekly', until: '2026-11-16' } }, exec);
+  assert.deepEqual(lines, ['修改日程：周会（2026-11-16T21:30:00-05:00 → 2026-11-16T21:30:00-05:00，本次及以后，重复：每周，到 2026-12-14 为止 → 每周，到 2026-11-16 为止，之后 4 次不再出现）']);
+});
+
 test('a failed log write never fails the action, and lines append to the file', async () => {
   const broken = withLog([fake('notes_create', { created: true, folder: '助手', title: 't' })], async () => { throw new Error('disk full'); });
   assert.deepEqual(await broken[0].execute({}, exec), { created: true, folder: '助手', title: 't' });
