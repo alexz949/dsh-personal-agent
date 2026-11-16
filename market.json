@@ -1,0 +1,63 @@
+{
+  "format": 1,
+  "title": {
+    "en": "DSH Personal Agent",
+    "zh": "DSH 个人助理"
+  },
+  "description": {
+    "en": "Plugin index for DSH Personal Agent, a macOS personal assistant for DeepSeek Harness.",
+    "zh": "DSH 个人助理插件的索引：DeepSeek Harness 上的 macOS 个人助理。"
+  },
+  "metadata": {
+    "categories": {
+      "productivity": {
+        "title": {
+          "en": "Productivity",
+          "zh": "效率"
+        }
+      }
+    }
+  },
+  "plugins": [
+    {
+      "name": "dsh-personal-agent",
+      "title": {
+        "en": "Personal Agent",
+        "zh": "个人助理"
+      },
+      "description": {
+        "en": "A personal assistant for macOS: Apple Calendar, Reminders, Notes and Mail (drafts only, never sends), tasks kept in sync with Reminders and Mail, rescheduling, a 今日 sticky note, a weekly journal and six personalities.",
+        "zh": "macOS 个人助理：接入 Apple 日历、提醒事项、备忘录和邮件（只存草稿、从不发送），任务与提醒事项和邮件保持同步，支持改期，还有今日便签、每周日记和六种性格。"
+      },
+      "author": "alexz949",
+      "homepage": "https://github.com/alexz949/dsh-personal-agent#readme",
+      "repository": {
+        "url": "https://github.com/alexz949/dsh-personal-agent"
+      },
+      "metadata": {
+        "category": "productivity",
+        "keywords": [
+          "personal assistant",
+          "macos",
+          "calendar",
+          "reminders",
+          "mail",
+          "tasks",
+          "journal"
+        ]
+      },
+      "versions": [
+        {
+          "version": "0.21.6",
+          "publishTimestamp": 1794813395,
+          "source": {
+            "type": "npm"
+          },
+          "engines": {
+            "dsh": ">=0.2.2-rc.3 <0.3.0"
+          }
+        }
+      ]
+    }
+  ]
+}
