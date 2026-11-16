@@ -163,7 +163,7 @@ export function journalTools({ workspace, actionLog, tasksFile, fs = { readFile,
     name: 'journal_status',
     description: 'Look at the journal before writing in it: which file holds a given day (this week\'s file), whether that day already has an entry, that day\'s lines from the action log, the tasks that changed that day, the 今日 note (done and open items), and which finished weeks and months still lack a summary, with the files to read for each. Read-only.',
     parameters: { type: 'object', additionalProperties: false, properties: { date: { type: 'string', description: 'YYYY-MM-DD; defaults to today.' } } },
-    output: { schema: { type: 'object' }, render: (_args, value) => JSON.stringify(value, null, 2) },
+    output: { schema: { type: 'object' }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }] },
     presentCall: args => card('查看日记', args.date ?? '今天'),
     async execute(args, exec) {
       const today = now();
@@ -197,7 +197,7 @@ export function journalTools({ workspace, actionLog, tasksFile, fs = { readFile,
       },
       required: ['period', 'text'],
     },
-    output: { schema: { type: 'object' }, render: (_args, value) => JSON.stringify(value, null, 2) },
+    output: { schema: { type: 'object' }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }] },
     presentCall: args => ({ ...card({ day: '写今日小结', week: '写本周总结', month: '写月度总结', quarter: '写季度总结', year: '写年度总结' }[args.period] ?? '写日记', args.date ?? '今天'), kind: 'edit' }),
     async execute(args, exec) {
       const date = args.date === undefined ? now() : parseDay(args.date);

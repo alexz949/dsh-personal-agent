@@ -150,7 +150,7 @@ const STATUS = { type: 'string', enum: STATUSES };
 export function taskTools({ store, run = runHelper, todoList, now = () => new Date() }) {
   const stamp = () => now().toISOString();
   const card = (title, kind, body) => ({ card: 'generic', title, kind, content: [{ type: 'text', text: body }] });
-  const output = { schema: { type: 'object' }, render: (_args, value) => JSON.stringify(value, null, 2) };
+  const output = { schema: { type: 'object' }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }] };
   return [{
     name: 'task_create',
     description: `Record a task the user has to get done, with a stable id, without asking first. Pass mail_id (from mail_list) when it comes from an email: the same email never makes a second task, and the existing one is returned instead. Pass reminder_id (from reminders_list) to attach an existing reminder, or add_todo: true to also put it in the user's "${todoList}" Reminders list (then Reminders owns its done state and due time). done_when "replied" means it is done once the user has replied to that email; otherwise write the completion condition in a few words. waiting_on names who the user is waiting for.`,

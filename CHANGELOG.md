@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.21.7
+
+- Fix `content.some is not a function` on today_update, journal_status, journal_write, task_create, task_update, task_list and browser_save_output: their output render now returns content blocks, as DSH 0.2.x expects. A test keeps every tool on that format.
+
 ## 0.21.6
 
 - First npm release. The helper is now a universal binary (Apple silicon and Intel), and the package can also be found through a plugin index (`market.json`).

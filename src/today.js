@@ -26,7 +26,7 @@ export function todayTool({ workspace, read = readFile, write = writeFile, move 
     name: 'today_update',
     description: `Update the user's 今日 sticky note (${TODAY_FILE} in this workspace) without asking first. Use it during the day whenever something on it gets done (op done), stops applying (remove), changes (edit), or a new thing for today comes up that the user should keep in view, such as a deadline, a meeting or a reply they owe (add; first: true when it is now the most urgent). Keep each item one short sentence; at most 8 open items. Never put email bodies, grades, codes, links or other private details on it. A note from an earlier day is carried over to today automatically. The morning check still writes the whole note with write.`,
     parameters: { type: 'object', additionalProperties: false, properties: { changes: { type: 'array', minItems: 1, items: CHANGE } }, required: ['changes'] },
-    output: { schema: { type: 'object' }, render: (_args, value) => JSON.stringify(value, null, 2) },
+    output: { schema: { type: 'object' }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }] },
     presentCall: args => ({ card: 'generic', title: '更新今日便签', kind: 'edit', content: [{ type: 'text', text: (args.changes ?? []).map(describe).join('\n') }] }),
     async execute(args, exec) {
       const dir = await workspace(exec);

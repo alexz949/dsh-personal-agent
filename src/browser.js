@@ -49,7 +49,7 @@ export function browserLoginTool({ profile, holder = profileHolder, launch = ope
     name: 'browser_login',
     description: 'Open the assistant browser\'s profile in a visible Google Chrome window so the user can sign in to a site (a school portal with two-step login, Gmail) that the headless mcp__browser__* tools hit a login page on. Call mcp__browser__browser_close first: the profile can be open in only one browser at a time. Then ask the user to sign in in that window and quit it with ⌘Q (the whole Chrome window, not just the tab) and to tell you when done; after that the mcp__browser__* tools reuse the saved login. Never type passwords or codes yourself.',
     parameters: { type: 'object', additionalProperties: false, properties: { url: { type: 'string', description: 'The sign-in page or the page to reach, as a full https:// address.' } } },
-    output: { schema: { type: 'object' }, render: (_args, value) => JSON.stringify(value, null, 2) },
+    output: { schema: { type: 'object' }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }] },
     presentCall: args => ({ card: 'generic', title: '打开助手浏览器登录', kind: 'edit', content: [{ type: 'text', text: String(args.url ?? '') }] }),
     async execute(args) {
       const url = loginUrl(args.url);
@@ -77,7 +77,7 @@ export function saveOutputTool({ output, workspace, copy = copyFile, mkdirp = mk
       },
       required: ['file'],
     },
-    output: { schema: { type: 'object' }, render: (_args, value) => JSON.stringify(value, null, 2) },
+    output: { schema: { type: 'object' }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }] },
     presentCall: args => ({ card: 'generic', title: '保存浏览器截图', kind: 'edit', content: [{ type: 'text', text: String(args.name ?? args.file ?? '') }] }),
     async execute(args, exec) {
       const raw = String(args.file ?? '').trim(), wanted = String(args.name ?? raw).trim();
