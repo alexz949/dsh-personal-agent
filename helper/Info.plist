@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleIdentifier</key>
+	<string>io.github.alexz949.personal-agent.helper</string>
+	<key>CFBundleName</key>
+	<string>Personal Agent Helper</string>
+	<key>CFBundleDisplayName</key>
+	<string>Personal Agent Helper</string>
+	<key>CFBundleExecutable</key>
+	<string>PersonalAgentHelper</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>1.0</string>
+	<key>CFBundleVersion</key>
+	<string>1</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>14.0</string>
+	<key>LSUIElement</key>
+	<true/>
+	<key>NSCalendarsFullAccessUsageDescription</key>
+	<string>Lets Personal Agent in DSH read your calendar and add events after you confirm. 让 DSH 中的 Personal Agent 查看日程，并在你确认后新建日程。</string>
+	<key>NSRemindersFullAccessUsageDescription</key>
+	<string>Lets Personal Agent in DSH read your reminders, add reminders and mark them done. 让 DSH 中的 Personal Agent 查看、新建提醒事项并把提醒标记为完成。</string>
+	<key>NSAppleEventsUsageDescription</key>
+	<string>Lets Personal Agent in DSH search, read and create notes, and read mail and save drafts in Mail. 让 DSH 中的 Personal Agent 搜索、阅读和新建备忘录，阅读邮件并存草稿。</string>
+</dict>
+</plist>

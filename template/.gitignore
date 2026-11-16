@@ -1,0 +1,17 @@
+data/
+**/.mnemon/
+**/.claude/
+**/CLAUDE.local.md
+**/AGENTS.local.md
+agents/*/notes/private/
+agents/*/literature/
+agents/life/today.md
+agents/*/journal/
+agents/life/files/
+.env
+.env.*
+*.key
+*.pem
+.DS_Store
+__pycache__/
+*.pyc

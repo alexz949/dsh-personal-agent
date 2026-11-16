@@ -1,0 +1,13 @@
+node_modules/
+lib/
+helper/PersonalAgentHelper.app/
+helper/.build-sha256
+*.tgz
+.DS_Store
+.claude/
+.env
+.env.*
+*.swp
+*.swo
+.*.sw?
+*~
