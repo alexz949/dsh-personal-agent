@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The morning check reports 记下的事 as its own section (every open task, overdue and soon-due ones marked), and the evening reports do too: a new 晚间检查 ("做晚间检查") lists what got done today and what is left, and other evening reports such as 写今日小结 end with the same section.
+
 - "记下的事": the overview page and the 今日 tab list the open tasks from `tasks.json` (dated ones first, with who it waits on and the next step), with a 核对 button that asks the assistant to check Reminders and Mail. The preset prompt sends "帮我记住要做……" to `task_create`, and keeps Mnemon memory for preferences and long-term facts.
 
 - The 今日 note can be resized: drag the grip in its bottom inner corner (240–440 px wide, up to the bottom of the window). A taller note shows every item and scrolls; the size is remembered and a double click on the grip resets it. By default it now shows five items instead of three.
