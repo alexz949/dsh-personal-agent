@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, rm } from 'node:fs/promises';
+import { mkdtemp, mkdir, readlink, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { profileHolder, loginUrl, chromeArgs, browserLoginTool, keepSessionCookies, keepSiteCookies, watchLoginWindow, startLoginKeeper, siteOf, loadSites, rememberSites } from '../src/browser.js';
+import { profileHolder, loginUrl, chromeArgs, browserLoginTool, findChromium, linkChromium, keepSessionCookies, keepSiteCookies, watchLoginWindow, startLoginKeeper, siteOf, loadSites, rememberSites } from '../src/browser.js';
 
 test('the profile holder comes from a live SingletonLock', async () => {
   const link = target => async () => target;
@@ -17,6 +17,7 @@ test('only full http(s) addresses are opened', () => {
   assert.equal(loginUrl('https://canvas.example.edu/login'), 'https://canvas.example.edu/login');
   assert.equal(loginUrl(undefined), undefined);
   for (const bad of ['canvas.example.edu', 'file:///etc/passwd', 'javascript:alert(1)']) assert.throws(() => loginUrl(bad), /full http\(s\) address/);
+  assert.deepEqual(chromeArgs('/p', 'https://a.example/', '/x/Chromium.app').slice(0, 2), ['-na', '/x/Chromium.app']);
   assert.deepEqual(chromeArgs('/p', 'https://a.example/'), ['-na', 'Google Chrome', '--args', '--user-data-dir=/p', '--use-mock-keychain', '--password-store=basic', '--no-first-run', '--no-default-browser-check', 'https://a.example/']);
 });
 
@@ -128,4 +129,37 @@ test('the login keeper runs when the profile is free at start and again after ea
   await new Promise(resolve => setTimeout(resolve, 50));
   stop();
   assert.deepEqual(kept, [1, 5]);
+});
+
+test('the newest Chrome for Testing build is found and the fixed link follows it', async () => {
+  const cache = await mkdtemp(join(tmpdir(), 'pa-cache-'));
+  try {
+    assert.equal(await findChromium({ cache }), undefined);
+    for (const build of ['chromium-1200', 'chromium-1252', 'chromium_headless_shell-1300', 'ffmpeg-1013']) await mkdir(join(cache, build));
+    await mkdir(join(cache, 'chromium-1200', 'chrome-mac-arm64', 'Google Chrome for Testing.app'), { recursive: true });
+    assert.equal(await findChromium({ cache }), join(cache, 'chromium-1200', 'chrome-mac-arm64', 'Google Chrome for Testing.app'));
+    await mkdir(join(cache, 'chromium-1252', 'chrome-mac-x64', 'Google Chrome for Testing.app'), { recursive: true });
+    const newest = join(cache, 'chromium-1252', 'chrome-mac-x64', 'Google Chrome for Testing.app');
+    assert.equal(await findChromium({ cache }), newest);
+
+    const link = join(cache, 'Chromium.app');
+    const find = () => findChromium({ cache });
+    assert.equal(await linkChromium(link, { find }), newest);
+    assert.equal(await readlink(link), newest);
+    await rm(join(cache, 'chromium-1252'), { recursive: true });
+    assert.equal(await linkChromium(link, { find }), join(cache, 'chromium-1200', 'chrome-mac-arm64', 'Google Chrome for Testing.app'));
+    const real = join(cache, 'Real.app');
+    await mkdir(real);
+    assert.equal(await linkChromium(real, { find }), real, 'a real folder is left alone');
+    assert.equal(await linkChromium(join(cache, 'none.app'), { find: async () => undefined }), undefined);
+  } finally {
+    await rm(cache, { recursive: true, force: true });
+  }
+});
+
+test('browser_login says how to install the assistant browser when it is missing', async () => {
+  const tool = browserLoginTool({ profile: '/p', app: '/missing/Chromium.app', holder: async () => undefined, exists: async () => false, launch: async () => assert.fail('must not launch'), watch: () => assert.fail('must not watch') });
+  const value = await tool.execute({});
+  assert.equal(value.opened, false);
+  assert.match(value.reason, /playwright-core\/cli\.js install chromium/);
 });

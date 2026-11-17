@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- The assistant browser is now Playwright's own Chrome for Testing, not the user's Google Chrome, so the two no longer get in each other's way (links from other apps landing in the assistant's window, two Chrome icons, quitting the wrong one). Install it with `node node_modules/playwright-core/cli.js install chromium` in `~/.dsh/mcp/playwright`. The plugin keeps `~/.dsh/mcp/playwright/Chromium.app` (setting `browserApp`) linked to the newest build; Playwright MCP starts it with `--executable-path` and `browser_login` opens it. The headless shell is not used, since it takes no profile lock. The existing profile and its logins carry over (both are Chrome 157).
+
 - To-dos now go to `task_create` everywhere in the preset prompt (with `add_todo` for a linked reminder when there is a due time), so they show under 记下的事; before, the to-do rule, the morning check and the memory rule still sent them to `todo_add` or Reminders. `task_create` returns an open task with the same title instead of making a copy.
 
 - The morning check reports 记下的事 as its own section (every open task, overdue and soon-due ones marked), and the evening reports do too: a new 晚间检查 ("做晚间检查") lists what got done today and what is left, and other evening reports such as 写今日小结 end with the same section.

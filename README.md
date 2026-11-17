@@ -126,13 +126,16 @@ The preset starts Playwright MCP from `~/.dsh/mcp/playwright`, using `/usr/local
 
 ```bash
 mkdir -p ~/.dsh/mcp/playwright && cd ~/.dsh/mcp/playwright && npm install @playwright/mcp
+node node_modules/playwright-core/cli.js install chromium
 ```
+
+The second line downloads Playwright's own **Chrome for Testing** (about 250 MB). The assistant uses it instead of your Google Chrome: it is a separate app with its own Dock icon, so links from other apps never open in it and quitting it never quits your Chrome. The plugin keeps `~/.dsh/mcp/playwright/Chromium.app` linked to the newest installed build (setting `browserApp`), and both the background browser and the sign-in window start from that link. Run the install line again after updating `@playwright/mcp`.
 
 On Apple Silicon with Homebrew, Node is usually `/opt/homebrew/bin/node`. Change `command` in the `mcp-browser` row of `cordis.patch.yml`. If it is not installed, the other tools keep working.
 
-The browser runs **headless**, so no window opens while the assistant works. It uses its own Chrome profile in `~/.dsh/mcp/playwright/profile` and never sees your everyday Chrome logins.
+The browser runs **headless**, so no window opens while the assistant works. It uses its own profile in `~/.dsh/mcp/playwright/profile` and never sees your everyday Chrome logins.
 
-When a site needs you to sign in (for example a two-step school login), the assistant closes the background browser and calls `browser_login`. That opens the same profile in a visible Google Chrome window. Sign in, quit that window with ⌘Q, and the background browser reuses the saved login from then on. Many school portals sign in with session cookies, which Chrome drops on its next start; when the window quits, the plugin turns the session cookies used there into cookies that last 30 days (in the assistant's profile only, logged in the action log). It remembers those sites and does this again whenever the background browser closes, since sites like Canvas replace their session cookie on every page. The site can still end the session on its side, and two-step login may ask again. You can also start this from **登录助手浏览器** at the bottom of the overview page. The profile path can be changed with `browserProfile` in the settings file.
+When a site needs you to sign in (for example a two-step school login), the assistant closes the background browser and calls `browser_login`. That opens the same profile in a visible Chrome for Testing window. Sign in, quit that window with ⌘Q, and the background browser reuses the saved login from then on. Many school portals sign in with session cookies, which Chrome drops on its next start; when the window quits, the plugin turns the session cookies used there into cookies that last 30 days (in the assistant's profile only, logged in the action log). It remembers those sites and does this again whenever the background browser closes, since sites like Canvas replace their session cookie on every page. The site can still end the session on its side, and two-step login may ask again. You can also start this from **登录助手浏览器** at the bottom of the overview page. The profile path can be changed with `browserProfile` in the settings file.
 
 To read pages the assistant links to without leaving DSH, set DSH's chat link preference to open links in the in-app sidebar. DSH's own sidebar browser is for you only: the model cannot see or control it.
 

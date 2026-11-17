@@ -20,6 +20,9 @@ export const DEFAULTS = Object.freeze({
   tasksFile: join(SETTINGS_DIR, 'tasks.json'),
   // The assistant browser's Chrome profile, shared by the headless Playwright MCP and browser_login.
   browserProfile: join(homedir(), '.dsh', 'mcp', 'playwright', 'profile'),
+  // The assistant browser app (Playwright's Chrome for Testing), a link kept pointing at the newest
+  // installed build. Playwright MCP starts it through --executable-path, browser_login through open.
+  browserApp: join(homedir(), '.dsh', 'mcp', 'playwright', 'Chromium.app'),
   // Where the assistant browser saves screenshots and other files (Playwright MCP's --output-dir).
   browserOutput: join(homedir(), '.dsh', 'mcp', 'playwright', 'output'),
 });
