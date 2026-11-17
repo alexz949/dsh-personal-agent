@@ -148,6 +148,35 @@ function Today({ brief, status, ask }) {
     body);
 }
 
+// What the assistant wrote down for the user to do (tasks.json), soonest due first. The list is as
+// the assistant last recorded it; asking it checks Reminders and Mail for the latest.
+const TASK_LABEL = { doing: '进行中', waiting: '等待' };
+function dueText(due) {
+  if (!due) return undefined;
+  const [, m, d, time] = /^\d{4}-(\d{2})-(\d{2})(?:T(\d{2}:\d{2}))?/.exec(due) ?? [];
+  return m ? `${Number(m)}/${Number(d)}${time ? ` ${time}` : ''} 截止` : undefined;
+}
+function Tasks({ file, ask }) {
+  const [open, setOpen] = React.useState(false);
+  const tasks = file.status === 'ok' ? parseOpenTasks(file.text) : file.status === 'missing' || file.status === 'nosession' ? [] : undefined;
+  const shown = open ? tasks ?? [] : (tasks ?? []).slice(0, 4);
+  let body;
+  if (file.status === 'loading') body = h('div', { className: 'pa-skel pa-skel-row', 'aria-hidden': true });
+  else if (tasks === undefined) body = h('p', { className: 'pa-section-empty' }, '暂时读不到记下的事。');
+  else if (tasks.length === 0) body = h('p', { className: 'pa-section-empty' }, '还没有记下的事。跟助理说“帮我记住……”，就会记在这里。');
+  else body = h(React.Fragment, null,
+    h('ul', { className: 'pa-tasks' }, shown.map(task => h('li', { key: task.id ?? task.title },
+      h('span', { className: 'pa-task-title' }, task.title),
+      (task.next || task.waiting_on || task.due || TASK_LABEL[task.status]) && h('span', { className: 'pa-task-meta' },
+        [task.status === 'waiting' ? `等 ${task.waiting_on ?? '回复'}` : TASK_LABEL[task.status], dueText(task.due), task.next && `下一步：${task.next}`].filter(Boolean).join(' · '))))),
+    tasks.length > 4 && h('button', { className: 'pa-link pa-more', onClick: () => setOpen(!open) }, open ? '收起' : `还有 ${tasks.length - 4} 件`));
+  return h('section', { className: 'pa-section', 'aria-label': '记下的事' },
+    h('header', { className: 'pa-section-head' },
+      h('h2', null, icon('check', 14), '记下的事'),
+      tasks?.length > 0 && h('button', { className: 'pa-head-action', onClick: () => ask('我还有哪些要办的事？帮我核对一下'), title: '让助理去提醒事项和邮件里核对最新情况' }, '核对')),
+    body);
+}
+
 // Recent actions stay folded away behind one line until asked for.
 function Actions({ file }) {
   const [open, setOpen] = React.useState(false);
@@ -299,6 +328,7 @@ function usePersonal(ctx) {
   const activity = recent.map(item => `${item.id}:${item.running ? 1 : 0}:${item.updatedAt ?? ''}`).join('|');
   const today = useTextFile(ctx, reader, workspace && `${workspace.path.replace(/\/+$/, '')}/${TODAY_FILE}`, activity);
   const actions = useTextFile(ctx, reader, actionsPathFor(workspace?.path), activity);
+  const tasks = useTextFile(ctx, reader, tasksPathFor(workspace?.path), activity);
   const brief = today.status === 'ok' ? parseBrief(today.text) : undefined;
   const points = brief && !brief.stale ? brief.items.length : 0;
   const [storedMain, setStoredMain] = React.useState(() => readStored(MAIN_KEY));
@@ -308,11 +338,11 @@ function usePersonal(ctx) {
     if (main && main.id !== storedMain) { writeStored(MAIN_KEY, main.id); setStoredMain(main.id); }
   }, [main?.id, storedMain]);
   function setMain(id) { writeStored(MAIN_KEY, id); setStoredMain(id); }
-  return { workspaces, sessions, ready, failed, workspace, recent, main, others, setMain, chooseWorkspace, today, actions, brief, points };
+  return { workspaces, sessions, ready, failed, workspace, recent, main, others, setMain, chooseWorkspace, today, actions, tasks, brief, points };
 }
 
 function AssistantPanel({ ctx }) {
-  const { workspaces, sessions, ready, failed, workspace, main, others, setMain, chooseWorkspace, today, actions, brief, points } = usePersonal(ctx);
+  const { workspaces, sessions, ready, failed, workspace, main, others, setMain, chooseWorkspace, today, actions, tasks, brief, points } = usePersonal(ctx);
   const creating = React.useRef(false);
   const now = Date.now();
   const [busy, setBusy] = React.useState(false);
@@ -349,7 +379,9 @@ function AssistantPanel({ ctx }) {
   else if (!workspace) below = h(WorkspaceSetup, { choices: workspaceChoices(workspaces, sessions), choose: chooseWorkspace });
   else below = h(React.Fragment, null,
     h('div', { className: 'pa-below' },
-      h(Today, { brief, status: today.status, ask }),
+      h('div', { className: 'pa-below-col' },
+        h(Today, { brief, status: today.status, ask }),
+        h(Tasks, { file: tasks, ask })),
       h(Conversations, { main, others, busy, now, resume, setMain, newChat: () => ask('', { fresh: true }) })),
     h(Actions, { file: actions }),
     h('footer', { className: 'pa-footer', title: workspace.path },
@@ -376,7 +408,7 @@ const TODAY_TAB_ID = 'dsh-personal-agent/today';
 const TODAY_KIND = 'personal-today';
 
 function TodayTab({ ctx }) {
-  const { ready, failed, workspace, main, others, setMain, today, actions, brief, points } = usePersonal(ctx);
+  const { ready, failed, workspace, main, others, setMain, today, actions, tasks, brief, points } = usePersonal(ctx);
   const [busy, setBusy] = React.useState(false);
   const now = Date.now();
   const overview = () => ctx.layout.selectPanel(PANEL_ID);
@@ -403,6 +435,7 @@ function TodayTab({ ctx }) {
   else body = h(React.Fragment, null,
     h('div', { className: 'pa-chips' }, QUICK_ASKS.map(item => h('button', { key: item, className: 'pa-chip', disabled: busy || !main, onClick: () => ask(item) }, item))),
     h(Today, { brief, status: today.status, ask }),
+    h(Tasks, { file: tasks, ask }),
     h(Conversations, { main, others, busy, now, resume, setMain, newChat }),
     h(Actions, { file: actions }));
   return h('section', { className: 'pa-tab', 'aria-label': '今日' },
@@ -449,6 +482,45 @@ function Splash() {
 const STICKY_KEY = 'personal-agent.sticky';
 const STICKY_POS_KEY = 'personal-agent.sticky.pos';
 const STICKY_GAP = 20;
+const STICKY_SIZE_KEY = 'personal-agent.sticky.size';
+
+function readStickySize() {
+  try { return clampStickySize(JSON.parse(readStored(STICKY_SIZE_KEY) ?? 'null') ?? {}); } catch { return clampStickySize({}); }
+}
+
+// Resizing from the grip in the note's bottom corner: the inner corner (bottom left on the right
+// side, bottom right on the left side), so the note grows away from the window edge. Height stops
+// above the bottom of the window. A double click goes back to the default size.
+function useStickyResize(side, initial) {
+  const [size, setSize] = React.useState(initial);
+  const start = React.useRef(null);
+  function onPointerDown(event) {
+    if (event.button !== 0) return;
+    event.stopPropagation();
+    const box = event.currentTarget.parentElement.getBoundingClientRect();
+    start.current = { x0: event.clientX, y0: event.clientY, width: box.width, height: box.height, maxHeight: (window.innerHeight ?? 800) - box.top - 16 };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }
+  function onPointerMove(event) {
+    const s = start.current;
+    if (!s) return;
+    event.stopPropagation();
+    const dx = side === 'left' ? event.clientX - s.x0 : s.x0 - event.clientX;
+    setSize(clampStickySize({ width: s.width + dx, height: s.height + event.clientY - s.y0 }, s.maxHeight));
+  }
+  function onPointerUp(event) {
+    if (!start.current) return;
+    event.stopPropagation();
+    start.current = null;
+    setSize(current => { writeStored(STICKY_SIZE_KEY, JSON.stringify(current)); return current; });
+  }
+  function onDoubleClick(event) {
+    event.stopPropagation();
+    writeStored(STICKY_SIZE_KEY, undefined);
+    setSize(clampStickySize({}));
+  }
+  return { size, grip: { onPointerDown, onPointerMove, onPointerUp, onPointerCancel: onPointerUp, onDoubleClick, onClick: event => event.stopPropagation() } };
+}
 
 function readStickyPos() {
   try {
@@ -490,7 +562,7 @@ function useStickyDrag(leftInset, commit) {
   const place = (event, s) => ({ x: event.clientX - s.dx - s.frame.left, y: event.clientY - s.dy - s.frame.top });
   function onPointerDown(event) {
     moved.current = false;
-    if (event.button !== 0 || event.target.closest?.('button:not([data-drag]), a')) return;
+    if (event.button !== 0 || event.target.closest?.('button:not([data-drag]), a, [data-resize]')) return;
     const note = event.currentTarget;
     const box = note.getBoundingClientRect(), frame = (note.offsetParent ?? document.body).getBoundingClientRect();
     const clearance = parseFloat(getComputedStyle(note).getPropertyValue('--dsh-frame-top-clearance')) || 48;
@@ -536,6 +608,7 @@ function StickyNote({ ctx }) {
   const [pos, setPos] = React.useState(readStickyPos);
   const inset = useStore(leftEdge) ?? 0;
   const { drag, wasDrag, handlers } = useStickyDrag(inset, next => { writeStored(STICKY_POS_KEY, JSON.stringify(next)); setPos(next); });
+  const { size, grip } = useStickyResize(pos.side, readStickySize());
   // Steps aside while the left sidebar (workspaces and conversations) is open, and comes back when
   // it is collapsed again. A note being dragged stays until it is dropped.
   if (!ready || !workspace || !main || onScreen !== main.id || (inset > 0 && !drag)) return null;
@@ -544,6 +617,8 @@ function StickyNote({ ctx }) {
   const top = pos.top == null ? undefined : Math.min(pos.top, (window.innerHeight ?? 800) - 80);
   const style = drag ? { left: drag.x, top: drag.y, right: 'auto' }
     : pos.side === 'left' ? { left: inset + STICKY_GAP, right: 'auto', top } : { top };
+  const sized = size.height != null;
+  const noteStyle = { ...style, width: size.width, ...sized ? { height: size.height } : {} };
   const place = `pa-side-${drag ? 'moving' : pos.side}${drag ? ` pa-sticky-${drag.mode}` : ''}`;
   async function ask(prompt) {
     if (busy) return;
@@ -560,24 +635,29 @@ function StickyNote({ ctx }) {
   if (today.status === 'loading') body = h('div', { className: 'pa-skel pa-skel-row', 'aria-hidden': true });
   else if (items.length === 0 && finished > 0) body = h('p', { className: 'pa-sticky-empty' }, `今天的 ${finished} 件事都办完了。`);
   else if (items.length === 0) body = h('p', { className: 'pa-sticky-empty' }, '还没有今天的要点。', h('button', { className: 'pa-link', disabled: busy, onClick: () => ask('做早间检查') }, '做早间检查'));
-  else body = h(React.Fragment, null,
-    h('ul', { className: 'pa-points' }, items.slice(0, 3).map((item, i) => h('li', { key: i, className: i === 0 ? 'pa-point-first' : undefined }, item))),
-    (items.length > 3 || brief.stale) && h('p', { className: 'pa-sticky-empty' },
-      brief.stale ? `这是 ${brief.date} 的要点。` : `还有 ${items.length - 3} 条${finished ? `，已划掉 ${finished} 件` : ''}，`,
-      h('button', { className: 'pa-link', onClick: () => ctx.layout.selectPanel(PANEL_ID) }, brief.stale ? '去总览更新' : '在总览里看')),
-    items.length <= 3 && !brief.stale && finished > 0 && h('p', { className: 'pa-sticky-empty' }, `已划掉 ${finished} 件。`));
+  else {
+    // A note the user made taller shows every item and scrolls; otherwise the first few.
+    const shown = sized ? items.length : STICKY_POINTS;
+    body = h(React.Fragment, null,
+      h('ul', { className: 'pa-points' }, items.slice(0, shown).map((item, i) => h('li', { key: i, className: i === 0 ? 'pa-point-first' : undefined }, item))),
+      (items.length > shown || brief.stale) && h('p', { className: 'pa-sticky-empty' },
+        brief.stale ? `这是 ${brief.date} 的要点。` : `还有 ${items.length - shown} 条${finished ? `，已划掉 ${finished} 件` : ''}，`,
+        h('button', { className: 'pa-link', onClick: () => ctx.layout.selectPanel(PANEL_ID) }, brief.stale ? '去总览更新' : '在总览里看')),
+      items.length <= shown && !brief.stale && finished > 0 && h('p', { className: 'pa-sticky-empty' }, `已划掉 ${finished} 件。`));
+  }
   // A click anywhere on the note that is not a button or link (and not the end of a drag) folds it
   // back into the pill, the way a click on the pill unfolds it; Escape does the same from inside.
-  const foldOnClick = event => { if (!event.target.closest?.('button, a')) fold('folded'); };
+  const foldOnClick = event => { if (!event.target.closest?.('button, a, [data-resize]')) fold('folded'); };
   const foldOnEscape = event => { if (event.key === 'Escape') { event.stopPropagation(); fold('folded'); } };
-  return h('aside', { className: `pa-sticky ${place}`, style, ...handlers, onClick: foldOnClick, onKeyDown: foldOnEscape, 'aria-label': '今日便签', title: '点击收起 · 拖动可移到左边或右边' },
+  return h('aside', { className: `pa-sticky ${place}${sized ? ' pa-sticky-sized' : ''}`, style: noteStyle, ...handlers, onClick: foldOnClick, onKeyDown: foldOnEscape, 'aria-label': '今日便签', title: '点击收起 · 拖动可移到左边或右边' },
     h('span', { className: 'pa-sticky-pin', 'aria-hidden': true }),
     h('header', { className: 'pa-sticky-head' },
       h('h2', null, icon('sun', 13), '今日', brief?.date && !brief.stale && h('span', { className: 'pa-time' }, brief.date.slice(5).replace('-', '/'))),
       h('button', { className: 'pa-sticky-icon', onClick: () => ctx.layout.selectPanel(PANEL_ID), title: '打开总览' }, icon('chevron', 13)),
     ),
-    body,
-    h('div', { className: 'pa-sticky-asks' }, QUICK_ASKS.map(item => h('button', { key: item, className: 'pa-chip', disabled: busy, onClick: () => ask(item) }, item))));
+    h('div', { className: 'pa-sticky-body' }, body),
+    h('div', { className: 'pa-sticky-asks' }, QUICK_ASKS.map(item => h('button', { key: item, className: 'pa-chip', disabled: busy, onClick: () => ask(item) }, item))),
+    !drag && h('span', { className: 'pa-sticky-grip', 'data-resize': true, 'aria-hidden': true, title: '拖动调整大小 · 双击还原', ...grip }));
 }
 
 // Wait for a condition DSH reaches asynchronously, checking every 100 ms.

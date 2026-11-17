@@ -8,6 +8,41 @@ export function actionsPathFor(workspacePath) {
   const home = /^(\/Users\/[^/]+)\//.exec(workspacePath ?? '')?.[1];
   return home ? `${home}/.dsh/personal-agent/actions.md` : undefined;
 }
+/** The task file's default place, next to the action log: ~/.dsh/personal-agent/tasks.json. */
+export function tasksPathFor(workspacePath) {
+  const home = /^(\/Users\/[^/]+)\//.exec(workspacePath ?? '')?.[1];
+  return home ? `${home}/.dsh/personal-agent/tasks.json` : undefined;
+}
+
+const OPEN_TASKS = new Set(['todo', 'doing', 'waiting']);
+
+/** Open tasks from tasks.json for "记下的事": dated ones first, soonest first, then the newest. An
+ * unreadable file gives undefined, so the page can say so instead of showing an empty list. */
+export function parseOpenTasks(text) {
+  if (String(text ?? '').trim() === '') return [];
+  let data;
+  try { data = JSON.parse(text); } catch { return undefined; }
+  if (!Array.isArray(data?.tasks)) return undefined;
+  const line = value => typeof value === 'string' && value.trim() !== '' ? value.replace(/\s+/g, ' ').trim() : undefined;
+  return data.tasks
+    .filter(task => task && OPEN_TASKS.has(task.status) && line(task.title))
+    .map(task => ({ id: task.id, title: line(task.title), status: task.status, next: line(task.next), waiting_on: line(task.waiting_on), due: line(task.due), created: String(task.created ?? ''), mail: task.source?.kind === 'mail' }))
+    .sort((a, b) => (a.due ? 0 : 1) - (b.due ? 0 : 1) || (a.due && b.due ? Date.parse(a.due.length === 10 ? `${a.due}T23:59:59` : a.due) - Date.parse(b.due.length === 10 ? `${b.due}T23:59:59` : b.due) : b.created.localeCompare(a.created)));
+}
+
+// The 今日 note's size: dragged from its bottom corner within these bounds, and remembered. Without
+// a chosen height it fits its content and shows the first STICKY_POINTS items.
+export const STICKY_SIZE = { width: 272, minWidth: 240, maxWidth: 440, minHeight: 150 };
+export const STICKY_POINTS = 5;
+
+export function clampStickySize(size, maxHeight = Infinity) {
+  const width = Math.round(Math.min(STICKY_SIZE.maxWidth, Math.max(STICKY_SIZE.minWidth, Number(size?.width) || STICKY_SIZE.width)));
+  const wanted = Number(size?.height);
+  if (size?.height == null || !Number.isFinite(wanted)) return { width, height: null };
+  const top = Math.max(STICKY_SIZE.minHeight, maxHeight);
+  return { width, height: Math.round(Math.min(top, Math.max(STICKY_SIZE.minHeight, wanted))) };
+}
+
 export const QUICK_ASKS = ['做早间检查', '看看谁还没回我', '这周有哪些截止？'];
 
 const padDay = value => String(value).padStart(2, '0');

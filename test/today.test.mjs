@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parseBrief, updateBrief } from '../src/home.js';
+import { parseBrief, updateBrief, clampStickySize, STICKY_SIZE, parseOpenTasks, tasksPathFor } from '../src/home.js';
 import { todayTool } from '../src/today.js';
 
 const now = new Date(2026, 10, 15, 14, 0);
@@ -63,4 +63,29 @@ test('note changes go to the action log', async () => {
   const { DESCRIBE } = await import('../src/log.js');
   assert.equal(DESCRIBE.today_update({ changes: [{ op: 'done', match: 'HW5' }, { op: 'add', text: '周五前确认推荐信' }] }, { updated: true }), '更新今日便签：划掉“HW5”，加上“周五前确认推荐信”');
   assert.equal(DESCRIBE.today_update({ changes: [] }, { updated: false }), false);
+});
+
+test('the sticky note size stays within its bounds and a missing height means fit to content', () => {
+  assert.deepEqual(clampStickySize({}), { width: STICKY_SIZE.width, height: null });
+  assert.deepEqual(clampStickySize({ width: 900, height: 2000 }, 600), { width: 440, height: 600 });
+  assert.deepEqual(clampStickySize({ width: 100, height: 40 }), { width: 240, height: 150 });
+  assert.deepEqual(clampStickySize({ width: 'x', height: 'tall' }), { width: 272, height: null });
+  assert.deepEqual(clampStickySize({ width: 300, height: 400 }, 90), { width: 300, height: 150 });
+});
+
+test('记下的事 lists open tasks, dated ones first, and says when tasks.json cannot be read', () => {
+  const file = JSON.stringify({ version: 1, tasks: [
+    { id: 'a', title: '回 Li 教授', status: 'waiting', waiting_on: 'Li 教授', created: '2026-11-15T10:00', source: { kind: 'mail' } },
+    { id: 'b', title: '交 ECE 作业', status: 'todo', due: '2026-11-18', next: '写完第 3 题', created: '2026-11-14T09:00' },
+    { id: 'c', title: '买牛奶', status: 'done', created: '2026-11-16T09:00' },
+    { id: 'd', title: '交材料', status: 'doing', due: '2026-11-17T17:00:00-05:00', created: '2026-11-13T09:00' },
+    { id: 'e', title: '订机票', status: 'todo', created: '2026-11-16T12:00' },
+  ] });
+  assert.deepEqual(parseOpenTasks(file).map(task => task.id), ['d', 'b', 'e', 'a']);
+  assert.equal(parseOpenTasks(file).find(task => task.id === 'a').mail, true);
+  assert.deepEqual(parseOpenTasks(''), []);
+  assert.equal(parseOpenTasks('{oops'), undefined);
+  assert.equal(parseOpenTasks('{"tasks": 3}'), undefined);
+  assert.equal(tasksPathFor('/Users/me/agents/life'), '/Users/me/.dsh/personal-agent/tasks.json');
+  assert.equal(tasksPathFor(undefined), undefined);
 });

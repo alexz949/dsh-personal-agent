@@ -23,9 +23,11 @@ A personal assistant plugin for DeepSeek Harness (DSH) on macOS. It adds a **Per
   - A small note pinned over the main conversation with today's top items and quick questions.
   - Drag it to either side; it snaps to the nearer edge and remembers where you put it.
   - Click the note to fold it into a small pill, and click the pill to open it again.
+  - Drag the grip in its bottom inner corner to make it wider or taller; a taller note shows every item and scrolls. It remembers the size, and a double click on the grip goes back to the default. Without a chosen height it shows the first five items.
   - It steps aside while the left sidebar is open, and comes back when you collapse it.
   - The assistant crosses items off and adds new ones as the day goes (`today_update`).
 - **Tasks with one consistent state.**
+  - Say "帮我记住……" (remember that I need to…) and the assistant records it as a task. The overview page and the 今日 tab show these under 记下的事, soonest due first, with the next step and who it waits on.
   - Each task gets a stable id and keeps where it came from (an email's Message-ID), the next step, who it waits on and when it counts as done. The same email never makes a second task.
   - Ownership is split: Reminders owns a linked reminder's done state and due time, Calendar owns events, the plugin's `tasks.json` keeps only links and context, and the 今日 note is a view.
   - `task_list` checks Reminders and Mail first, so a reminder ticked off or a reply sent directly in those apps shows up. It tells "draft saved" apart from "reply sent", and when a check fails it says so instead of reporting everything done.
