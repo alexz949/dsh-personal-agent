@@ -153,7 +153,7 @@ export function taskTools({ store, run = runHelper, todoList, now = () => new Da
   const output = { schema: { type: 'object' }, render: (_args, value) => [{ type: 'text', text: JSON.stringify(value, null, 2) }] };
   return [{
     name: 'task_create',
-    description: `Record a task the user has to get done, with a stable id, without asking first. Pass mail_id (from mail_list) when it comes from an email: the same email never makes a second task, and the existing one is returned instead. Pass reminder_id (from reminders_list) to attach an existing reminder, or add_todo: true to also put it in the user's "${todoList}" Reminders list (then Reminders owns its done state and due time). done_when "replied" means it is done once the user has replied to that email; otherwise write the completion condition in a few words. waiting_on names who the user is waiting for.`,
+    description: `Record a task the user has to get done, with a stable id, without asking first. This is where the user's to-dos live: they show under 记下的事 on the DSH overview page and the 今日 tab. An open task with the same title is returned instead of a copy. Pass mail_id (from mail_list) when it comes from an email: the same email never makes a second task, and the existing one is returned instead. Pass reminder_id (from reminders_list) to attach an existing reminder, or add_todo: true to also put it in the user's "${todoList}" Reminders list (then Reminders owns its done state and due time). done_when "replied" means it is done once the user has replied to that email; otherwise write the completion condition in a few words. waiting_on names who the user is waiting for.`,
     parameters: {
       type: 'object', additionalProperties: false,
       properties: {
@@ -188,6 +188,10 @@ export function taskTools({ store, run = runHelper, todoList, now = () => new Da
       return store.update(async data => {
         const same = data.tasks.find(task => (source.message_id && task.source?.message_id === source.message_id) || (reminder && task.links?.reminder?.external_id === reminder.external_id));
         if (same) return { changed: false, created: false, reason: 'a task for this email or reminder already exists', task: taskView(same) };
+        // A daily check that writes the same to-do again gets the open task back instead of a copy.
+        const key = oneLine(title).toLowerCase();
+        const twin = source.kind === 'chat' && !reminder && data.tasks.find(task => OPEN.has(task.status) && task.source?.kind === 'chat' && oneLine(task.title).toLowerCase() === key);
+        if (twin) return { changed: false, created: false, reason: 'an open task with this title already exists', task: taskView(twin) };
         if (args.add_todo === true && !reminder) {
           const made = await run({ op: 'reminders.create', title, list: todoList, ...due ? { due } : {}, notes: source.kind === 'mail' ? `来自邮件：${oneLine(source.from)} · ${oneLine(source.subject)}` : undefined }, exec.signal);
           reminder = { external_id: made.reminder.external_id, list: made.reminder.list, title: made.reminder.title };

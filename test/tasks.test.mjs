@@ -159,3 +159,14 @@ test('writes are queued so concurrent creates never lose a task', async () => {
   await Promise.all(Array.from({ length: 5 }, (_, i) => tools.task_create.execute({ title: `事项 ${i}` }, exec)));
   assert.equal(JSON.parse(files.get('/s/tasks.json')).tasks.length, 5);
 });
+
+test('a to-do written again while still open returns the existing task instead of a copy', async () => {
+  const { tools, apple } = setup();
+  const first = await tools.task_create.execute({ title: '交 PhD 申请材料', add_todo: true, due: '2026-12-01' }, exec);
+  const again = await tools.task_create.execute({ title: ' 交 PhD  申请材料 ', add_todo: true }, exec);
+  assert.equal(again.created, false);
+  assert.equal(again.task.id, first.task.id);
+  assert.equal(apple.state.reminders.size, 1, 'no second reminder either');
+  await tools.task_update.execute({ id: first.task.id, status: 'done' }, exec);
+  assert.equal((await tools.task_create.execute({ title: '交 PhD 申请材料' }, exec)).created, true, 'a finished task can be written down again');
+});
