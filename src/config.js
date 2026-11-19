@@ -14,6 +14,10 @@ export const DEFAULTS = Object.freeze({
   notesFolder: 'Assistant',
   // BibTeX file that bib_add appends to; bib_add is not offered until one is set.
   bibLibrary: undefined,
+  // The model for ask_computer's screen work (and its provider route, default openai), e.g.
+  // gpt-6.1-terra; read by the preset's !!js expression. Unset keeps DSH's default model.
+  computerModel: undefined,
+  computerProvider: undefined,
   // Where the action log goes.
   actionLog: join(SETTINGS_DIR, 'actions.md'),
   // Tasks: links between the user's tasks and their reminders, events and emails, plus context.

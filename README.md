@@ -114,11 +114,13 @@ Optional, in `~/.dsh/personal-agent/config.json`. You can override the path with
   "bibLibrary": "~/Documents/JabRef/library.bib",
   "actionLog": "~/.dsh/personal-agent/actions.md",
   "browserProfile": "~/.dsh/mcp/playwright/profile",
-  "tasksFile": "~/.dsh/personal-agent/tasks.json"
+  "tasksFile": "~/.dsh/personal-agent/tasks.json",
+  "computerModel": "gpt-6.1-terra",
+  "computerProvider": "openai"
 }
 ```
 
-`bib_add` is offered only when `bibLibrary` is set.
+`bib_add` is offered only when `bibLibrary` is set. `computerModel` (with `computerProvider`, default `openai`) picks the model `ask_computer`'s child uses for screen work, so a stronger vision model can drive the screen while Personal Agent keeps its own; the model must exist on that provider route in your DSH profile (for OpenAI, the `@deepseek-ai/dsh-llm-pi-ai` row), with its API key set in DSH. Leave it out to use DSH's default model. Restart DSH after changing it.
 
 ### Browser automation (optional)
 

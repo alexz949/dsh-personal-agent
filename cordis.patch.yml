@@ -216,13 +216,16 @@
           # Computer use: DSH's Computer Use (an experimental plugin, switched on in Plugins) only
           # reaches PTC sessions, so Personal Agent hands screen work to a child on the built-in ptc
           # preset, which drives Mac apps through its `cua` SDK. Without the plugin the child has no
-          # computer tools and says so.
+          # computer tools and says so. The child's model comes from computerModel (and
+          # computerProvider, default openai) in the plugin settings file, so a stronger vision model
+          # can drive the screen while Personal Agent keeps its own; unset, it uses the default model.
           - id: tool-ask-computer
             name: "@deepseek-ai/dsh-tool-subagent"
             config:
               provider: spawn
               toolName: ask_computer
               agentPreset: ptc
+              agentOptions: !!js "(() => { try { const fs = process.getBuiltinModule('node:fs'); const file = process.env.PERSONAL_AGENT_CONFIG || (process.env.HOME + '/.dsh/personal-agent/config.json'); const s = JSON.parse(fs.readFileSync(file, 'utf8')); const model = typeof s.computerModel === 'string' ? s.computerModel.trim() : ''; const provider = typeof s.computerProvider === 'string' && s.computerProvider.trim() ? s.computerProvider.trim() : 'openai'; return model ? { provider, model } : {}; } catch { return {}; } })()"
           - id: skill-filesystem
             name: "@deepseek-ai/dsh-skill-filesystem"
           - id: tool-skill
