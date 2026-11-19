@@ -156,6 +156,7 @@ To read pages the assistant links to without leaving DSH, set DSH's chat link pr
 | `journal_status`, `journal_write` | read / write the weekly journal | no |
 | `bib_add` | append a paper to your BibTeX file | no |
 | `arxiv_search` | search arXiv | no |
+| `ask_computer` | hands screen work (reading a WeChat or QQ window, say) to a child on DSH's built-in `ptc` preset, which drives Mac apps through DSH's experimental Computer Use. Needs **Computer use** switched on under Plugins → More and macOS permissions for DSH Computer Use. The assistant asks you first, tells the child to read only (no typing, sending, paying or deleting), and shows what it found before recording anything | yes (in chat), plus DSH's own per-app consent |
 | `notify` | macOS notification banner | no |
 | `browser_login` | open the assistant browser's profile in a visible Chrome window for signing in | no |
 | `browser_save_output` | copy a browser screenshot into the workspace's `files/` so it shows inline in the chat | no |

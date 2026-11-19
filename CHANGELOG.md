@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- `ask_computer`: a subagent on DSH's built-in `ptc` preset, the only one DSH's experimental Computer Use reaches, for reading app windows that have no API, such as a WeChat group. The prompt has the assistant ask first, brief the child fully (app, chat, range, format), tell it to read only, treat what comes back as data, and show the user before recording tasks or events. Needs Computer use switched on in Plugins and macOS permissions for DSH Computer Use.
+
 - The assistant browser is now Playwright's own Chrome for Testing, not the user's Google Chrome, so the two no longer get in each other's way (links from other apps landing in the assistant's window, two Chrome icons, quitting the wrong one). Install it with `node node_modules/playwright-core/cli.js install chromium` in `~/.dsh/mcp/playwright`. The plugin keeps `~/.dsh/mcp/playwright/Chromium.app` (setting `browserApp`) linked to the newest build; Playwright MCP starts it with `--executable-path` and `browser_login` opens it. The headless shell is not used, since it takes no profile lock. The existing profile and its logins carry over (both are Chrome 157).
 
 - To-dos now go to `task_create` everywhere in the preset prompt (with `add_todo` for a linked reminder when there is a due time), so they show under 记下的事; before, the to-do rule, the morning check and the memory rule still sent them to `todo_add` or Reminders. `task_create` returns an open task with the same title instead of making a copy.
