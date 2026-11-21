@@ -10,7 +10,7 @@ await mkdir(new URL('lib/', root), { recursive: true });
 await writeFile(new URL('lib/client.js', root), `window.__ModuleLoader__.load({id:"dsh-personal-agent",factory:(require)=>{\nconst exports = {};\n${helpers}\nconst CSS = ${JSON.stringify(css)};\n${client}\nreturn exports;\n}});\n`);
 await writeFile(new URL('lib/index.js', root), '// The host row enrolls the client UI. The preset is composed by cordis.patch.yml.\nexport function apply() {}\n');
 // The preset loads these tools by package subpath; they run in the DSH host as is.
-await Promise.all(['notify', 'apple', 'arxiv', 'bib', 'log', 'config', 'home', 'today', 'journal', 'browser', 'tasks', 'sensitive', 'when'].map(name => copyFile(new URL(`src/${name}.js`, root), new URL(`lib/${name}.js`, root))));
+await Promise.all(['notify', 'apple', 'arxiv', 'bib', 'log', 'config', 'home', 'today', 'journal', 'browser', 'tasks', 'sensitive', 'secrets', 'when'].map(name => copyFile(new URL(`src/${name}.js`, root), new URL(`lib/${name}.js`, root))));
 
 // macOS grants Calendar, Reminders and Notes access to the helper's exact code signature, so it is
 // rebuilt only when its sources change; an unchanged helper keeps the user's permission grants.

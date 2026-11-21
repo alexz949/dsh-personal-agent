@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+- Password book: `secret_save`, `secret_get`, `secret_list` and `secret_delete` keep passwords, card and ID numbers in the macOS login keychain through new helper ops (`keychain.save/get/list/delete`), behind a confirmation card for saving, each use and deleting. Secret requests reach the helper through a private temporary file (`runHelper(..., { viaFile: true })`) instead of argv. The prompt sends secrets there instead of memory or files, uses `secret_get` before asking the user for a login, and lets the assistant keep ordinary details in the user profile file up to date.
+
 - `sensitive_confirm`: a confirmation card the assistant must get, every time, before typing a password, verification code, card or ID number into a page, showing a credential in the chat, saving one, or reading a site's cookies or storage. The card names what, where and why, never the value; one yes covers one action, and approvals go to the action log. With it, the prompt lets the assistant do these things instead of refusing them outright. Also in the Codex MCP server.
 
 - More room for the assistant: it may look at related mail, calendar, notes, files and pages on its own to get a task done, fill forms from the user profile file without asking field by field, submit ordinary forms (sign-ups, bookings, surveys) and make ordinary downloads without asking first. Payments, formal applications, posting, deleting and sending messages still need the user's yes; it still never types passwords, codes, card or ID numbers, and now never reads site cookies, login credentials or local storage.

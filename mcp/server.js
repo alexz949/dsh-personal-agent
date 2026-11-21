@@ -14,12 +14,12 @@ import { pathToFileURL } from 'node:url';
 
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
 const SERVER = { name: 'personal-agent', version: '0.21.7' };
-const SOURCES = ['../src/apple.js', '../src/notify.js', '../src/arxiv.js', '../src/bib.js', '../src/log.js', '../src/config.js', '../src/tasks.js', '../src/today.js', '../src/journal.js', '../src/sensitive.js'].map(path => new URL(path, import.meta.url));
+const SOURCES = ['../src/apple.js', '../src/notify.js', '../src/arxiv.js', '../src/bib.js', '../src/log.js', '../src/config.js', '../src/tasks.js', '../src/today.js', '../src/journal.js', '../src/sensitive.js', '../src/secrets.js'].map(path => new URL(path, import.meta.url));
 
 /** Load the tool modules; a new version string imports a fresh copy of files that were edited. */
 export async function loadTools(questions, version = '') {
   const query = version ? `?v=${encodeURIComponent(version)}` : '';
-  const [{ appleTools, todoTool, completeTool, changeTools }, { notifyTool }, { arxivTool }, { bibTool }, { actionLogger, withLog }, { loadSettings }, { taskTools, taskStore }, { todayTool }, { journalTools }, { sensitiveTool }] = await Promise.all(SOURCES.map(url => import(url.href + query)));
+  const [{ appleTools, todoTool, completeTool, changeTools }, { notifyTool }, { arxivTool }, { bibTool }, { actionLogger, withLog }, { loadSettings }, { taskTools, taskStore }, { todayTool }, { journalTools }, { sensitiveTool }, { secretTools }] = await Promise.all(SOURCES.map(url => import(url.href + query)));
   const settings = loadSettings();
   const folder = settings.workspace ?? process.env.PERSONAL_AGENT_WORKSPACE;
   const workspace = async () => {
@@ -29,7 +29,7 @@ export async function loadTools(questions, version = '') {
   const notify = notifyTool();
   notify.description = 'Show a macOS notification banner with a sound on this Mac, for example when the user asks to be told when work is done. Success means macOS accepted the banner, not that the user saw it.';
   const bib = settings.bibLibrary ? [bibTool({ library: settings.bibLibrary })] : [];
-  return withLog([...appleTools({ questions, notesFolder: settings.notesFolder }), todoTool({ list: settings.todoList }), completeTool({ questions, list: settings.todoList }), ...changeTools({ questions }), ...taskTools({ store: taskStore(settings.tasksFile), todoList: settings.todoList }), todayTool({ workspace }), ...journalTools({ workspace, actionLog: settings.actionLog, tasksFile: settings.tasksFile }), sensitiveTool({ questions }), notify, arxivTool(), ...bib], actionLogger({ path: settings.actionLog }));
+  return withLog([...appleTools({ questions, notesFolder: settings.notesFolder }), todoTool({ list: settings.todoList }), completeTool({ questions, list: settings.todoList }), ...changeTools({ questions }), ...taskTools({ store: taskStore(settings.tasksFile), todoList: settings.todoList }), todayTool({ workspace }), ...journalTools({ workspace, actionLog: settings.actionLog, tasksFile: settings.tasksFile }), sensitiveTool({ questions }), ...secretTools({ questions }), notify, arxivTool(), ...bib], actionLogger({ path: settings.actionLog }));
 }
 
 export function startServer({ input = process.stdin, output = process.stdout, makeTools = loadTools, confirm = 'elicitation', sources = SOURCES, watchSources = true } = {}) {

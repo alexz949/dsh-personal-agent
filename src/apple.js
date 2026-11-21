@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -18,11 +18,19 @@ const CONFIRM = '创建';
 const CANCEL = '取消';
 const WEEKDAYS = '日一二三四五六';
 
-export async function runHelper(request, signal) {
+/** Run one helper request. Secret requests go through a file in a private temporary folder
+ * (`viaFile`), so the password never appears in the process list. */
+export async function runHelper(request, signal, { viaFile = false } = {}) {
   if (process.platform !== 'darwin') throw new Error('Apple Calendar, Reminders, Notes and Mail are only available on macOS');
   const dir = await mkdtemp(join(tmpdir(), 'personal-agent-'));
   const out = join(dir, 'reply.json');
   try {
+    let argument = JSON.stringify(request);
+    if (viaFile) {
+      const file = join(dir, 'request.json');
+      await writeFile(file, argument, { encoding: 'utf8', mode: 0o600 });
+      argument = `@${file}`;
+    }
     // -W waits for the helper to exit, -n starts a fresh instance so its arguments arrive, -g keeps focus.
     // `open -W` sometimes fails to watch a helper that is starting or exiting quickly ("Unable to
     // block on applications"); the helper has usually written its reply anyway, so the reply file
@@ -31,7 +39,7 @@ export async function runHelper(request, signal) {
     for (let attempt = 0; attempt < 2 && text === ''; attempt++) {
       if (attempt > 0) await new Promise(resolve => setTimeout(resolve, 400));
       const failure = await new Promise(resolve => {
-        execFile('/usr/bin/open', ['-W', '-n', '-g', '--stdout', out, '-a', HELPER, '--args', JSON.stringify(request)], { timeout: 120e3, signal }, error => resolve(error));
+        execFile('/usr/bin/open', ['-W', '-n', '-g', '--stdout', out, '-a', HELPER, '--args', argument], { timeout: 120e3, signal }, error => resolve(error));
       });
       if (signal?.aborted) throw signal.reason ?? new Error('aborted');
       text = await readFile(out, 'utf8').catch(() => '');

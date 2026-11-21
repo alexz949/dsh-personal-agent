@@ -26,6 +26,9 @@ A personal assistant plugin for DeepSeek Harness (DSH) on macOS. It adds a **Per
   - Drag the grip in its bottom inner corner to make it wider or taller; a taller note shows every item and scrolls. It remembers the size, and a double click on the grip goes back to the default. Without a chosen height it shows the first five items.
   - It steps aside while the left sidebar is open, and comes back when you collapse it.
   - The assistant crosses items off and adds new ones as the day goes (`today_update`).
+- **A notebook and a password book.**
+  - It keeps your ordinary details (account names, login email, student ID, address, phone) up to date in your profile file when they change or you ask, and tells you what it changed.
+  - Passwords, card and ID numbers go into the macOS keychain instead (`secret_save`), never into memory or files. Using one (`secret_get`) asks you each time, naming the site and the field it goes into; Chrome's own autofill is used first when it has the password.
 - **Tasks with one consistent state.**
   - Say "帮我记住……" (remember that I need to…) and the assistant records it as a task. The overview page and the 今日 tab show these under 记下的事, soonest due first, with the next step and who it waits on.
   - Each task gets a stable id and keeps where it came from (an email's Message-ID), the next step, who it waits on and when it counts as done. The same email never makes a second task.
@@ -174,6 +177,7 @@ To read pages the assistant links to without leaving DSH, set DSH's chat link pr
 | `journal_status`, `journal_write` | read / write the weekly journal | no |
 | `bib_add` | append a paper to your BibTeX file | no |
 | `arxiv_search` | search arXiv | no |
+| `secret_list`, `secret_save`, `secret_get`, `secret_delete` | the password book: passwords, card and ID numbers you ask it to keep, in the macOS login keychain (service `io.github.alexz949.personal-agent`, visible in Keychain Access). Listing shows sites and usernames only | **yes** to save, use or delete, every time |
 | `sensitive_confirm` | the card the assistant must get before typing a password, verification code, card or ID number, showing or saving a credential, or reading a site's cookies or storage; names what and where, never the value, and one yes covers one action | **yes** (that is its job) |
 | `ask_computer` | hands screen work (reading a WeChat or QQ window, say) to a child on DSH's built-in `ptc` preset, which drives Mac apps through DSH's experimental Computer Use. Needs **Computer use** switched on under Plugins → More and macOS permissions for DSH Computer Use. The assistant asks you first, tells the child to read only (no typing, sending, paying or deleting), and shows what it found before recording anything | yes (in chat), plus DSH's own per-app consent |
 | `notify` | macOS notification banner | no |

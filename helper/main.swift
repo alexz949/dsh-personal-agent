@@ -1,10 +1,12 @@
 // Personal Agent helper: one request per launch. The DSH plugin starts this app through
 // LaunchServices (`open`), so macOS asks for Calendar, Reminders, Notes and Mail access on behalf
 // of this app rather than DSH, whose signature cannot request them. argv[1] is a JSON request with
-// an "op" field; exactly one JSON reply is written to stdout.
+// an "op" field, or "@<path>" naming a file that holds it (used for secrets, which must not appear
+// in the process list); exactly one JSON reply is written to stdout.
 import EventKit
 import Foundation
 import OSAKit
+import Security
 
 struct HelperError: Error {
   let code: String
@@ -759,10 +761,90 @@ func notesCreate(_ input: [String: Any]) throws -> Any {
   """)
 }
 
+// MARK: Keychain (the assistant's password book)
+
+// Passwords live in the login keychain as generic passwords under one service, so they are encrypted
+// at rest and visible in Keychain Access. The account attribute is "<site> · <username>".
+let keychainService = "io.github.alexz949.personal-agent"
+
+func keychainKey(_ input: [String: Any]) throws -> (site: String, username: String, account: String) {
+  let site = try requiredText(input["site"], "site")
+  let username = try requiredText(input["username"], "username")
+  guard !site.contains(" · "), !username.contains(" · ") else { throw invalid("site and username must not contain \" · \"") }
+  return (site, username, "\(site) · \(username)")
+}
+
+func keychainFailure(_ status: OSStatus, _ what: String) -> HelperError {
+  let text = (SecCopyErrorMessageString(status, nil) as String?) ?? "OSStatus \(status)"
+  return HelperError(code: status == errSecItemNotFound ? "not_found" : "keychain", message: "\(what)：\(text)")
+}
+
+func keychainSave(_ input: [String: Any]) throws -> [String: Any] {
+  let key = try keychainKey(input)
+  guard let password = input["password"] as? String, !password.isEmpty else { throw invalid("password must be a non-empty string") }
+  let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: keychainService, kSecAttrAccount as String: key.account]
+  let attributes: [String: Any] = [
+    kSecValueData as String: Data(password.utf8),
+    kSecAttrLabel as String: "Personal Agent: \(key.site)",
+    kSecAttrDescription as String: "Personal Agent 密码本",
+  ]
+  var status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+  let replaced = status == errSecSuccess
+  if status == errSecItemNotFound {
+    var item = query
+    for (name, value) in attributes { item[name] = value }
+    status = SecItemAdd(item as CFDictionary, nil)
+  }
+  guard status == errSecSuccess else { throw keychainFailure(status, "没能存进钥匙串") }
+  return ["saved": true, "replaced": replaced, "site": key.site, "username": key.username]
+}
+
+func keychainGet(_ input: [String: Any]) throws -> [String: Any] {
+  let key = try keychainKey(input)
+  let query: [String: Any] = [
+    kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: keychainService, kSecAttrAccount as String: key.account,
+    kSecReturnData as String: true, kSecMatchLimit as String: kSecMatchLimitOne,
+  ]
+  var result: CFTypeRef?
+  let status = SecItemCopyMatching(query as CFDictionary, &result)
+  guard status == errSecSuccess, let data = result as? Data, let password = String(data: data, encoding: .utf8) else {
+    throw keychainFailure(status == errSecSuccess ? errSecDecode : status, "没能从钥匙串取出")
+  }
+  return ["site": key.site, "username": key.username, "password": password]
+}
+
+func keychainList(_ input: [String: Any]) throws -> [String: Any] {
+  let query: [String: Any] = [
+    kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: keychainService,
+    kSecReturnAttributes as String: true, kSecMatchLimit as String: kSecMatchLimitAll,
+  ]
+  var result: CFTypeRef?
+  let status = SecItemCopyMatching(query as CFDictionary, &result)
+  if status == errSecItemNotFound { return ["entries": []] }
+  guard status == errSecSuccess, let items = result as? [[String: Any]] else { throw keychainFailure(status, "没能列出钥匙串条目") }
+  let entries: [[String: Any]] = items.compactMap { item in
+    guard let account = item[kSecAttrAccount as String] as? String, let split = account.range(of: " · ") else { return nil }
+    var entry: [String: Any] = ["site": String(account[..<split.lowerBound]), "username": String(account[split.upperBound...])]
+    if let date = item[kSecAttrModificationDate as String] as? Date { entry["updated"] = dayFormatter.string(from: date) }
+    return entry
+  }.sorted { ($0["site"] as? String ?? "") < ($1["site"] as? String ?? "") }
+  return ["entries": entries]
+}
+
+func keychainDelete(_ input: [String: Any]) throws -> [String: Any] {
+  let key = try keychainKey(input)
+  let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword, kSecAttrService as String: keychainService, kSecAttrAccount as String: key.account]
+  let status = SecItemDelete(query as CFDictionary)
+  guard status == errSecSuccess else { throw keychainFailure(status, "没能从钥匙串删除") }
+  return ["deleted": true, "site": key.site, "username": key.username]
+}
+
 // MARK: Dispatch
 
 let arguments = CommandLine.arguments
-guard arguments.count >= 2, let raw = arguments[1].data(using: .utf8),
+// "@<path>": read the request from that file instead, so a password never sits in argv.
+let requestText: String? = arguments.count >= 2 ? (arguments[1].hasPrefix("@") ? try? String(contentsOfFile: String(arguments[1].dropFirst()), encoding: .utf8) : arguments[1]) : nil
+guard let raw = requestText?.data(using: .utf8),
       let request = (try? JSONSerialization.jsonObject(with: raw)) as? [String: Any],
       let op = request["op"] as? String else {
   reply(["ok": false, "code": "invalid_input", "message": "Personal Agent 助手只能由 DSH 插件调用。"])
@@ -790,6 +872,10 @@ do {
   case "mail.draft": data = try mailDraft(request)
   case "mail.reply": data = try mailReplyDraft(request)
   case "notes.create": data = try notesCreate(request)
+  case "keychain.save": data = try keychainSave(request)
+  case "keychain.get": data = try keychainGet(request)
+  case "keychain.list": data = try keychainList(request)
+  case "keychain.delete": data = try keychainDelete(request)
   default: throw invalid("unknown op \(op)")
   }
   reply(["ok": true, "data": data])

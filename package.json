@@ -51,6 +51,7 @@
     "./browser": "./lib/browser.js",
     "./tasks": "./lib/tasks.js",
     "./sensitive": "./lib/sensitive.js",
+    "./secrets": "./lib/secrets.js",
     "./when": "./lib/when.js"
   },
   "scripts": {

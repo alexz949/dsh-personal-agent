@@ -36,6 +36,9 @@ export const DESCRIBE = {
   reminders_update: (_args, value) => value?.updated && `修改提醒：${one(value.before?.title)}（${one(value.before?.due ?? '无时间')} → ${one(value.reminder?.due ?? '无时间')}）`,
   calendar_update: (args, value) => value?.updated && `修改日程：${one(value.before?.title)}（${one(value.before?.start)} → ${one(value.event?.start)}${value.span === 'future' ? '，本次及以后' : ''}${args.repeat !== undefined ? `，重复：${describeRepeat(value.before?.repeat)} → ${describeRepeat(value.event?.repeat)}` : ''}${value.dropped_occurrences?.length ? `，之后 ${value.dropped_occurrences.length} 次不再出现` : ''}）`,
   calendar_delete: (_args, value) => value?.deleted && `删除日程：${one(value.event?.title)}（${one(value.event?.start)}${value.span === 'future' ? '，本次及以后' : value.span === 'this' && value.event?.recurring ? '，仅这一次' : ''}）`,
+  secret_save: (_args, value) => value?.saved && `存进密码本：${one(value.site)}（${one(value.username)}）`,
+  secret_get: (_args, value) => value?.taken && `从密码本取出：${one(value.site)}（${one(value.username)}）→ ${one(value.where)}`,
+  secret_delete: (_args, value) => value?.deleted && `从密码本删除：${one(value.site)}（${one(value.username)}）`,
   sensitive_confirm: (_args, value) => value?.approved && `允许敏感操作：${one(value.action)}（${one(value.what)} → ${one(value.where)}）`,
   today_update: (args, value) => value?.updated && `更新今日便签：${(args.changes ?? []).map(change => ({ add: `加上“${one(change.text)}”`, done: `划掉“${one(change.match)}”`, edit: `改“${one(change.match)}”为“${one(change.text)}”`, remove: `去掉“${one(change.match)}”` })[change?.op]).filter(Boolean).join('，')}`,
 };
