@@ -15,6 +15,8 @@ These tools act as soon as the model calls them, so the assistant can work witho
 | `bib_add` | appends to the BibTeX file named in settings, and only when one is set |
 | `task_create`, `task_update` | `tasks.json` in `~/.dsh/personal-agent/`; may add a to-do to, or tick one off in, the assistant Reminders list |
 
+Typing a password, verification code, card or ID number into a page, showing or saving a credential, and reading a site's cookies or storage each need a yes on a `sensitive_confirm` card first. The card names what and where, not the value; approvals are written to the action log. The value itself still passes through the model, so it reaches DeepSeek's API like the rest of the conversation.
+
 Creating calendar events and general reminders, changing or moving any existing event or reminder, and deleting an event (`calendar_delete`, the only tool that deletes anything in the Apple apps) always needs your confirmation in DSH, on a card that shows the old and new values. Deleting events, reminders or notes is not offered at all.
 
 ## Files it writes

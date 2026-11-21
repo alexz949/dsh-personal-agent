@@ -84,7 +84,7 @@ function tool({ name, description, properties, required: needed = [], card, exec
 }
 
 /** Ask through DSH's question card; nothing is created unless the user picks CONFIRM. */
-async function confirm(questions, exec, header, question, lines, yes = { label: CONFIRM, description: '按以上内容创建' }, no = '不创建') {
+export async function confirm(questions, exec, header, question, lines, yes = { label: CONFIRM, description: '按以上内容创建' }, no = '不创建') {
   if (questions === undefined) throw new Error('this session cannot ask the user to confirm, so nothing was created');
   let answer;
   try {

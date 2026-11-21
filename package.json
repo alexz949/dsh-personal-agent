@@ -50,6 +50,7 @@
     "./journal": "./lib/journal.js",
     "./browser": "./lib/browser.js",
     "./tasks": "./lib/tasks.js",
+    "./sensitive": "./lib/sensitive.js",
     "./when": "./lib/when.js"
   },
   "scripts": {
