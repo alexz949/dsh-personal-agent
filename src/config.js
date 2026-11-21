@@ -18,10 +18,21 @@ export const DEFAULTS = Object.freeze({
   // gpt-6.1-terra; read by the preset's !!js expression. Unset keeps DSH's default model.
   computerModel: undefined,
   computerProvider: undefined,
+  // The assistant's folder (today.md, journal/, AGENTS.md) for the MCP server used by Codex and Claude
+  // Code, which has no conversation folder of its own. DSH uses the conversation's workspace instead.
+  workspace: undefined,
   // Where the action log goes.
   actionLog: join(SETTINGS_DIR, 'actions.md'),
   // Tasks: links between the user's tasks and their reminders, events and emails, plus context.
   tasksFile: join(SETTINGS_DIR, 'tasks.json'),
+  // Which browser the mcp__browser__* tools drive: "background" (default) is the assistant's own
+  // headless Chrome for Testing with its own profile; "mine" is the user's running Chrome through the
+  // Playwright Extension, with the user's logins. Read by the preset's !!js expression and by browser.js.
+  browserMode: undefined,
+  // "mine" mode only: the Playwright Extension's own token (shown on its Manage clients page). With it
+  // the extension skips its approval page on each connection. A local secret: keep it in the settings
+  // file, never in a repository. Read only by the preset's !!js expression.
+  browserExtensionToken: undefined,
   // The assistant browser's Chrome profile, shared by the headless Playwright MCP and browser_login.
   browserProfile: join(homedir(), '.dsh', 'mcp', 'playwright', 'profile'),
   // The assistant browser app (Playwright's Chrome for Testing), a link kept pointing at the newest

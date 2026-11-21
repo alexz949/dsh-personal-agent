@@ -56,6 +56,10 @@ A personal assistant plugin for DeepSeek Harness (DSH) on macOS. It adds a **Per
 
 It also uses DSH's own tools: files, web search, bash in the DSH sandbox, schedules, Office files, skills and memory (with the Mnemon plugin). It can optionally drive a headless Chrome through Microsoft's Playwright MCP, with a visible window only when you need to sign in.
 
+## Codex
+
+The same assistant also installs as a Codex plugin, sharing its tasks, 今日 note, journal and action log with DSH. See [docs/codex.md](docs/codex.md) for what carries over, what Codex does better itself (browser, computer use, Office files, automations) and how to install it.
+
 ## Requirements
 
 - macOS 14 or later.
@@ -116,7 +120,8 @@ Optional, in `~/.dsh/personal-agent/config.json`. You can override the path with
   "browserProfile": "~/.dsh/mcp/playwright/profile",
   "tasksFile": "~/.dsh/personal-agent/tasks.json",
   "computerModel": "gpt-6.1-terra",
-  "computerProvider": "openai"
+  "computerProvider": "openai",
+  "browserMode": "background"
 }
 ```
 
@@ -134,6 +139,17 @@ node node_modules/playwright-core/cli.js install chromium
 The second line downloads Playwright's own **Chrome for Testing** (about 250 MB). The assistant uses it instead of your Google Chrome: it is a separate app with its own Dock icon, so links from other apps never open in it and quitting it never quits your Chrome. The plugin keeps `~/.dsh/mcp/playwright/Chromium.app` linked to the newest installed build (setting `browserApp`), and both the background browser and the sign-in window start from that link. Run the install line again after updating `@playwright/mcp`.
 
 On Apple Silicon with Homebrew, Node is usually `/opt/homebrew/bin/node`. Change `command` in the `mcp-browser` row of `cordis.patch.yml`. If it is not installed, the other tools keep working.
+
+#### Your own Chrome instead (`browserMode: "mine"`)
+
+By default the assistant has its own browser, described below. If you would rather have it work in the Chrome you already use, with the sites you are signed in to there:
+
+1. Install the [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm) in your Chrome.
+2. Put `"browserMode": "mine"` in `~/.dsh/personal-agent/config.json` and restart DSH.
+
+Playwright MCP then starts with `--extension`. The first time the assistant uses the browser in a session, Chrome shows a page where you approve the connection and pick the tabs it may control; it can reach only those tabs and the ones it opens itself. There is no separate profile, so `browser_login` and the login keeping below are switched off. The assistant acts with your own logins in this mode: it asks before submitting, paying, posting, deleting or sending, never types passwords, names the file and source before a download, and does not open what it downloads. To skip the approval page on every connection, click the extension's icon, copy the `PLAYWRIGHT_MCP_EXTENSION_TOKEN` value from its Manage clients page, and put it in the settings file as `"browserExtensionToken": "..."` (then restart DSH). The preset passes it to Playwright MCP as an environment variable. It is a local secret: anything that has it can open tabs in your Chrome without asking, so keep the settings file private (`chmod 600`) and rotate the token on that page if it leaks.
+
+#### The assistant's own browser (default)
 
 The browser runs **headless**, so no window opens while the assistant works. It uses its own profile in `~/.dsh/mcp/playwright/profile` and never sees your everyday Chrome logins.
 

@@ -1,5 +1,8 @@
 #!/usr/bin/env node
-// MCP server (stdio) that gives Claude Code the same Apple and notification tools as the DSH preset.
+// MCP server (stdio) that gives Claude Code and Codex the same Apple, task, 今日 note, journal and
+// notification tools as the DSH preset. The 今日 note and the journal live in the workspace named by
+// `workspace` in the settings file (or PERSONAL_AGENT_WORKSPACE), since an MCP server has no
+// conversation folder of its own.
 // It reuses the DSH tool definitions. The confirmation card becomes an MCP elicitation when the
 // client supports it, and otherwise nothing is created. With `--confirm=permission` the host's own
 // permission prompt for the create tools is the confirmation instead: the Claude desktop app
@@ -10,18 +13,23 @@ import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
 
 const PROTOCOLS = ['2025-06-18', '2025-03-26', '2024-11-05'];
-const SERVER = { name: 'personal-agent', version: '0.21.6' };
-const SOURCES = ['../src/apple.js', '../src/notify.js', '../src/arxiv.js', '../src/bib.js', '../src/log.js', '../src/config.js'].map(path => new URL(path, import.meta.url));
+const SERVER = { name: 'personal-agent', version: '0.21.7' };
+const SOURCES = ['../src/apple.js', '../src/notify.js', '../src/arxiv.js', '../src/bib.js', '../src/log.js', '../src/config.js', '../src/tasks.js', '../src/today.js', '../src/journal.js'].map(path => new URL(path, import.meta.url));
 
 /** Load the tool modules; a new version string imports a fresh copy of files that were edited. */
 export async function loadTools(questions, version = '') {
   const query = version ? `?v=${encodeURIComponent(version)}` : '';
-  const [{ appleTools, todoTool, completeTool, changeTools }, { notifyTool }, { arxivTool }, { bibTool }, { actionLogger, withLog }, { loadSettings }] = await Promise.all(SOURCES.map(url => import(url.href + query)));
+  const [{ appleTools, todoTool, completeTool, changeTools }, { notifyTool }, { arxivTool }, { bibTool }, { actionLogger, withLog }, { loadSettings }, { taskTools, taskStore }, { todayTool }, { journalTools }] = await Promise.all(SOURCES.map(url => import(url.href + query)));
   const settings = loadSettings();
+  const folder = settings.workspace ?? process.env.PERSONAL_AGENT_WORKSPACE;
+  const workspace = async () => {
+    if (!folder) throw new Error('no workspace is set: put "workspace": "/path/to/your/assistant/folder" (the one with today.md, journal/ and AGENTS.md) in ~/.dsh/personal-agent/config.json, then restart the session');
+    return folder;
+  };
   const notify = notifyTool();
   notify.description = 'Show a macOS notification banner with a sound on this Mac, for example when the user asks to be told when work is done. Success means macOS accepted the banner, not that the user saw it.';
   const bib = settings.bibLibrary ? [bibTool({ library: settings.bibLibrary })] : [];
-  return withLog([...appleTools({ questions, notesFolder: settings.notesFolder }), todoTool({ list: settings.todoList }), completeTool({ questions, list: settings.todoList }), ...changeTools({ questions }), notify, arxivTool(), ...bib], actionLogger({ path: settings.actionLog }));
+  return withLog([...appleTools({ questions, notesFolder: settings.notesFolder }), todoTool({ list: settings.todoList }), completeTool({ questions, list: settings.todoList }), ...changeTools({ questions }), ...taskTools({ store: taskStore(settings.tasksFile), todoList: settings.todoList }), todayTool({ workspace }), ...journalTools({ workspace, actionLog: settings.actionLog, tasksFile: settings.tasksFile }), notify, arxivTool(), ...bib], actionLogger({ path: settings.actionLog }));
 }
 
 export function startServer({ input = process.stdin, output = process.stdout, makeTools = loadTools, confirm = 'elicitation', sources = SOURCES, watchSources = true } = {}) {

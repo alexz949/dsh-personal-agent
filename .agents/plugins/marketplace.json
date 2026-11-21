@@ -1,0 +1,20 @@
+{
+  "name": "dsh-personal-agent",
+  "interface": {
+    "displayName": "DSH Personal Agent"
+  },
+  "plugins": [
+    {
+      "name": "personal-agent",
+      "source": {
+        "source": "local",
+        "path": "./"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Productivity"
+    }
+  ]
+}

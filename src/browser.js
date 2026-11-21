@@ -276,9 +276,14 @@ const keepers = new Map();
 
 export function apply(ctx, config) {
   const settings = loadSettings(config);
-  linkChromium(settings.browserApp).catch(error => process.stderr.write(`personal-agent: could not link the assistant browser: ${error?.message ?? error}\n`));
-  ctx.tools.register(browserLoginTool({ profile: settings.browserProfile, app: settings.browserApp, log: actionLogger({ path: settings.actionLog }) }));
-  // One keeper per profile, however many times the plugin is applied.
-  if (!keepers.has(settings.browserProfile)) keepers.set(settings.browserProfile, startLoginKeeper(settings.browserProfile));
+  // With browserMode "mine" the browser tools drive the user's own Chrome through the Playwright
+  // Extension, so there is no assistant profile to sign in to or keep logins for. The preset prompt
+  // tells the two modes apart by whether browser_login exists.
+  if (settings.browserMode !== 'mine') {
+    linkChromium(settings.browserApp).catch(error => process.stderr.write(`personal-agent: could not link the assistant browser: ${error?.message ?? error}\n`));
+    ctx.tools.register(browserLoginTool({ profile: settings.browserProfile, app: settings.browserApp, log: actionLogger({ path: settings.actionLog }) }));
+    // One keeper per profile, however many times the plugin is applied.
+    if (!keepers.has(settings.browserProfile)) keepers.set(settings.browserProfile, startLoginKeeper(settings.browserProfile));
+  }
   ctx.tools.register(saveOutputTool({ output: settings.browserOutput, workspace: exec => exec.agent === undefined ? undefined : ctx.workingDirectory.ensure(exec.agent, exec.signal) }));
 }

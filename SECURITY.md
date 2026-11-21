@@ -23,6 +23,7 @@ Creating calendar events and general reminders, changing or moving any existing 
 - `~/.dsh/personal-agent/actions.md`, the action log, and `~/.dsh/personal-agent/tasks.json`, task links and context.
 - Your BibTeX library, if configured.
 - Mail drafts and Notes in the assistant folder, through the Apple apps.
+- With `browserMode: "mine"` the browser tools act in your own Chrome through the Playwright Extension, with your logins. You approve each connection and choose the tabs in Chrome; the assistant reaches only those tabs and the ones it opens. The default mode keeps the assistant in a separate browser profile that never sees your everyday logins. If you set `browserExtensionToken`, the approval page is skipped: the token sits in plain text in the settings file and lets a local program open tabs in your Chrome without asking.
 - In the assistant browser's profile (`~/.dsh/mcp/playwright/profile`): after you sign in through `browser_login`, session cookies of the sites you signed in to are made to last 30 days, and those sites are listed in `personal-agent-kept-sites.json` there.
 
 ## Network

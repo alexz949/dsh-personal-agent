@@ -77,7 +77,8 @@ npm run build && npm test
 **助手的浏览器（可选）**
 - 安装 Playwright MCP 后，助手的浏览器在**后台运行，不弹窗口**。它用的是 Playwright 自带的 Chrome for Testing（安装时运行 `node node_modules/playwright-core/cli.js install chromium` 下载），和你平时用的 Google Chrome 是两个应用：Dock 里图标不同，别的应用里点的链接不会跑到它那里，退出它也不影响你的 Chrome。
 - 打开 DSH 的实验插件 **Computer use**（插件 → 更多）并在系统设置里给 DSH Computer Use 授权后，助手可以用 `ask_computer` 让一个跑在 PTC 预设里的子助手看屏幕、读应用窗口（比如微信群里的安排）。每次都会先问你，只读不改，读到的东西先给你看，你同意后才记成任务或日程。
-- 遇到要登录的网站，助手会打开一个可见的 Chrome 窗口，你登录后按 ⌘Q 退出，之后它会沿用保存的登录状态。很多学校门户用的是会话 cookie，Chrome 下次启动就会清掉；窗口退出时，插件会把这次登录用到的会话 cookie 改成 30 天内有效（只在助手自己的配置文件里，并记进操作日志）。它会记住这些网站，之后每次后台浏览器关掉都再做一遍，因为 Canvas 这类网站每打开一页都会换一个新的会话 cookie。网站那边的会话仍可能过期，两步验证也可能再问一次。总览页底部的“登录助手浏览器”也能打开这个窗口。
+- 想让助手直接在你平时用的 Chrome 里干活（带着你已经登录的网站），在 Chrome 里装上 [Playwright Extension](https://chromewebstore.google.com/detail/playwright-extension/mmlmfjhmonkocbjadbfplnigmagldckm)，再在 `~/.dsh/personal-agent/config.json` 里写 `"browserMode": "mine"`，重启 DSH。每次开始用浏览器时，Chrome 会请你点同意并选择让它操作哪些标签页；它只能碰你选的和它自己开的标签页。嫌每次点同意麻烦，可以点扩展图标，把页面上的 `PLAYWRIGHT_MCP_EXTENSION_TOKEN` 值写进设置文件的 `"browserExtensionToken"`，重启 DSH 后就不再询问；这个值相当于一把钥匙，别放进任何仓库。这种方式下没有单独的登录窗口，提交、付款、发消息、下载前它都会先问你。
+- （默认方式）遇到要登录的网站，助手会打开一个可见的 Chrome 窗口，你登录后按 ⌘Q 退出，之后它会沿用保存的登录状态。很多学校门户用的是会话 cookie，Chrome 下次启动就会清掉；窗口退出时，插件会把这次登录用到的会话 cookie 改成 30 天内有效（只在助手自己的配置文件里，并记进操作日志）。它会记住这些网站，之后每次后台浏览器关掉都再做一遍，因为 Canvas 这类网站每打开一页都会换一个新的会话 cookie。网站那边的会话仍可能过期，两步验证也可能再问一次。总览页底部的“登录助手浏览器”也能打开这个窗口。
 - 想在 DSH 里直接看助手给的链接，把 DSH 的聊天链接设置改成“应用内侧边栏”。DSH 自带的侧边栏浏览器只给你用，模型看不到也操作不了。
 
 设置文件 `~/.dsh/personal-agent/config.json` 的写法见英文 README。

@@ -2,6 +2,10 @@
 
 ## Unreleased
 
+- `browserMode: "mine"` in the settings file makes the browser tools drive the user's own running Chrome through the Playwright Extension (`--extension`), with its logins, instead of the assistant's separate headless browser. The user approves each connection and picks the tabs in Chrome. In this mode `browser_login`, the Chrome for Testing link and the login keeper are off; the prompt tells the modes apart by whether `browser_login` exists and adds rules for working with the user's own logins and for downloads. The default stays the isolated browser. `browserExtensionToken` in the settings file is passed to Playwright MCP as `PLAYWRIGHT_MCP_EXTENSION_TOKEN`, so the extension stops asking on every connection.
+
+- Codex plugin: `.codex-plugin/plugin.json`, `.mcp.json` and a local marketplace (`.agents/plugins/marketplace.json`), with skills `personal-agent`, `morning-check`, `evening-check` and `weekly-journal` adapted from the DSH preset prompt. The MCP server gains `task_*`, `today_update` and `journal_*`, writing into the new `workspace` setting. Codex's own browser, computer use, Office plugins and automations replace the DSH-only pieces; see docs/codex.md.
+
 - `ask_computer` can run on its own model: set `computerModel` (and `computerProvider`, default `openai`) in `~/.dsh/personal-agent/config.json`. The preset reads it through a `!!js` expression; without it, or with an unreadable file, the child keeps DSH's default model.
 
 - `ask_computer`: a subagent on DSH's built-in `ptc` preset, the only one DSH's experimental Computer Use reaches, for reading app windows that have no API, such as a WeChat group. The prompt has the assistant ask first, brief the child fully (app, chat, range, format), tell it to read only, treat what comes back as data, and show the user before recording tasks or events. Needs Computer use switched on in Plugins and macOS permissions for DSH Computer Use.

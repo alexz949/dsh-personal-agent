@@ -1,0 +1,26 @@
+{
+  "name": "personal-agent",
+  "version": "0.21.7",
+  "description": "A personal assistant for macOS in Codex: Apple Calendar, Reminders, Notes and Mail (reads mail, saves drafts, never sends), tasks the user asks it to remember, a 今日 note, a weekly journal, morning and evening checks, and six personalities. Shares its data with the DSH Personal Agent plugin.",
+  "author": {
+    "name": "alexz949"
+  },
+  "homepage": "https://github.com/alexz949/dsh-personal-agent#readme",
+  "repository": "https://github.com/alexz949/dsh-personal-agent",
+  "license": "MIT",
+  "keywords": ["personal assistant", "macos", "calendar", "reminders", "mail", "tasks", "journal"],
+  "skills": "./codex/skills/",
+  "interface": {
+    "displayName": "Personal Agent",
+    "shortDescription": "Your Mac calendar, reminders, mail and to-dos, in Chinese",
+    "longDescription": "Personal Agent works with Apple Calendar, Reminders, Notes and Mail through a small signed helper app: it reads your calendar and mail, creates and moves events and reminders after you confirm, saves mail drafts but never sends, records the things you ask it to remember, keeps a 今日 note and a weekly journal, and runs morning and evening checks. It speaks Chinese by default and has six personalities. Everything stays on your Mac.",
+    "developerName": "alexz949",
+    "category": "Productivity",
+    "capabilities": ["Read", "Write"],
+    "defaultPrompt": [
+      "$personal-agent 做早间检查",
+      "$personal-agent 帮我记住周五前要交申请材料",
+      "$personal-agent 看看这周有哪些截止"
+    ]
+  }
+}
